@@ -17,4 +17,4 @@ Push the project to a GitHub repository on the `main` branch. In the repository,
 
 ## Printing handoff
 
-The “Print with Form Now” action downloads the STL locally, then opens the Formlabs Form Now uploader. Browsers do not allow a website to silently upload a local model to another service, so the user selects the freshly downloaded STL on Form Now to receive a quote.
+The “Print with Form Now” action downloads the STL locally, then shows a persistent handoff panel with a link to the Formlabs Form Now uploader. Browsers do not allow a website to silently upload a local model to another service, so the user explicitly opens Form Now and selects the freshly downloaded STL to receive a quote.

@@ -68,6 +68,7 @@ export default function App() {
   const [preset, setPreset] = useState<DistributionPreset | "custom">("standard");
   const [exportState, setExportState] = useState<"idle" | "building" | "ready" | "error">("idle");
   const [showFaces, setShowFaces] = useState(false);
+  const [showPrintHandoff, setShowPrintHandoff] = useState(false);
 
   const estimatedVolume = useMemo(() => {
     const factor = { 6: 0.93, 8: 0.49, 10: 0.48, 12: 0.64, 20: 0.43 }[config.sides];
@@ -132,23 +133,20 @@ export default function App() {
     reader.readAsDataURL(file);
   };
 
-  const exportModel = async (printAfter = false) => {
+  const exportModel = async (showPrintOptions = false) => {
     if (config.markStyle === "graphic" && !config.graphicData) {
       document.getElementById("graphic-upload")?.click();
       return;
     }
     setExportState("building");
-    const formWindow = printAfter ? window.open("about:blank", "_blank") : null;
     try {
       const { buildDiceStl, saveBlob } = await import("./stlExport");
       const blob = await buildDiceStl(config);
       saveBlob(blob, `diceforge-d${config.sides}-${config.size}mm.stl`);
       setExportState("ready");
-      if (formWindow) formWindow.location.href = FORM_NOW_URL;
-      else if (printAfter) window.location.assign(FORM_NOW_URL);
+      if (showPrintOptions) setShowPrintHandoff(true);
     } catch (error) {
       console.error(error);
-      formWindow?.close();
       setExportState("error");
     }
   };
@@ -376,11 +374,26 @@ export default function App() {
               <span>{exportState === "building" ? "BUILDING MODEL…" : exportState === "ready" ? "DOWNLOAD AGAIN" : "DOWNLOAD STL"}</span><span>↓</span>
             </button>
             <button type="button" className="print-button" onClick={() => exportModel(true)} disabled={exportState === "building"}>
-              <span><b>PRINT WITH FORM NOW</b><small>Downloads STL + opens instant quote</small></span><span>↗</span>
+              <span><b>PRINT WITH FORM NOW</b><small>Downloads STL, then opens print options</small></span><span>↗</span>
             </button>
           </div>
         </div>
       </section>
+
+      {showPrintHandoff && (
+        <div className="handoff-backdrop" role="presentation">
+          <section className="handoff-dialog" role="dialog" aria-modal="true" aria-labelledby="handoff-title">
+            <button className="handoff-close" type="button" aria-label="Close print options" onClick={() => setShowPrintHandoff(false)}>×</button>
+            <span className="handoff-kicker">STL DOWNLOADED ✓</span>
+            <h2 id="handoff-title">Your die is ready to quote.</h2>
+            <p>Upload <b>diceforge-d{config.sides}-{config.size}mm.stl</b> on Form Now to choose a material and finish. Form Now currently ships within the United States.</p>
+            <div className="handoff-actions">
+              <a href={FORM_NOW_URL} target="_blank" rel="noreferrer" onClick={() => setShowPrintHandoff(false)}>OPEN FORM NOW <span>↗</span></a>
+              <button type="button" onClick={() => setShowPrintHandoff(false)}>NOT NOW</button>
+            </div>
+          </section>
+        </div>
+      )}
 
       <section className="how" id="about">
         <span className="vertical-label">WHY DICEFORGE</span>

@@ -171,6 +171,19 @@ a { color: inherit; text-decoration: none; }
 .print-button > span:last-child { font-size: 25px; }
 .error-note { color: #a82e15; font-size: 11px; padding: 0 20px; }
 
+.handoff-backdrop { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; padding: 20px; background: rgba(16, 18, 15, .72); backdrop-filter: blur(7px); }
+.handoff-dialog { width: min(560px, 100%); position: relative; padding: 46px; background: #f7f5f0; border: 1px solid var(--line); box-shadow: 0 28px 90px rgba(0, 0, 0, .32); }
+.handoff-close { position: absolute; top: 14px; right: 16px; width: 32px; height: 32px; border: 1px solid var(--line); background: transparent; cursor: pointer; font-size: 21px; line-height: 1; }
+.handoff-kicker { color: #4b7420; font: 500 9px/1 "DM Mono", monospace; letter-spacing: .12em; }
+.handoff-dialog h2 { margin: 18px 0 12px; font-size: clamp(28px, 4vw, 42px); line-height: 1; letter-spacing: -.055em; }
+.handoff-dialog p { margin: 0; max-width: 465px; color: var(--muted); font-size: 13px; line-height: 1.65; }
+.handoff-dialog p b { color: var(--ink); overflow-wrap: anywhere; }
+.handoff-actions { display: grid; grid-template-columns: 1.4fr .8fr; gap: 10px; margin-top: 30px; }
+.handoff-actions a, .handoff-actions button { min-height: 58px; border: 1px solid var(--ink); padding: 0 18px; display: flex; align-items: center; justify-content: space-between; cursor: pointer; font: 600 9px/1 "DM Mono", monospace; letter-spacing: .07em; }
+.handoff-actions a { background: var(--orange); }
+.handoff-actions button { background: transparent; justify-content: center; }
+.handoff-actions a span { font-size: 18px; }
+
 .how { min-height: 390px; margin: 120px clamp(20px, 3.5vw, 58px) 90px; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); display: grid; grid-template-columns: 90px repeat(3, 1fr); }
 .vertical-label { writing-mode: vertical-rl; transform: rotate(180deg); padding: 30px; font: 500 9px/1 "DM Mono", monospace; letter-spacing: .13em; border-right: 1px solid var(--line); }
 .how > div { padding: 45px clamp(24px, 3vw, 48px); border-right: 1px solid var(--line); }
@@ -222,6 +235,8 @@ footer > span { justify-self: end; font: 400 8px/1 "DM Mono", monospace; color: 
   .export-copy { padding: 30px 20px; }
   .export-actions { grid-template-columns: 1fr; height: auto; }
   .export-actions button { min-height: 84px; border-left: 0; border-top: 1px solid var(--line); padding: 0 22px; }
+  .handoff-dialog { padding: 42px 24px 24px; }
+  .handoff-actions { grid-template-columns: 1fr; }
   .how { margin: 80px 20px 60px; grid-template-columns: 42px 1fr; }
   .vertical-label { padding: 18px; }
   .how > div { padding: 34px 24px; }
