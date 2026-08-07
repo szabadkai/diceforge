@@ -2,16 +2,13 @@ import * as THREE from "three";
 import { Brush, Evaluator, SUBTRACTION } from "three-bvh-csg";
 import { STLExporter } from "three/examples/jsm/exporters/STLExporter.js";
 import { TextGeometry } from "three/examples/jsm/geometries/TextGeometry.js";
-import { FontLoader } from "three/examples/jsm/loaders/FontLoader.js";
 import { SVGLoader } from "three/examples/jsm/loaders/SVGLoader.js";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
-import helvetiker from "three/examples/fonts/helvetiker_bold.typeface.json";
 import { createDieGeometry, faceTransform, getDieFaceFrames } from "./diceGeometry";
 import type { FaceFrame } from "./diceGeometry";
+import { getFont } from "./stlFonts";
 import { pipLayout } from "./markTexture";
 import type { DiceConfig } from "./types";
-
-const font = new FontLoader().parse(helvetiker);
 
 function orientGeometry(geometry: THREE.BufferGeometry, frame: FaceFrame) {
   geometry.applyMatrix4(faceTransform(frame));
@@ -48,15 +45,24 @@ function makeTextCutters(config: DiceConfig, frames: FaceFrame[]) {
   frames.slice(0, config.sides).forEach((frame, faceIndex) => {
     const value = config.values[faceIndex]?.trim();
     if (!value) return;
-    const geometry = new TextGeometry(value.slice(0, 3), {
-      font,
-      size: frame.radius * (value.length > 1 ? 0.72 : 0.95) * config.patternScale,
+    const text = value.slice(0, config.markStyle === "text" ? 12 : 3);
+    const geometry = new TextGeometry(text, {
+      font: getFont(config.font),
+      size: frame.radius,
       depth: config.depth * 2.2,
       curveSegments: 3,
       bevelEnabled: false,
     });
     geometry.computeBoundingBox();
-    const box = geometry.boundingBox!;
+    let box = geometry.boundingBox!;
+    const width = Math.max(0.001, box.max.x - box.min.x);
+    const height = Math.max(0.001, box.max.y - box.min.y);
+    const targetWidth = frame.radius * (config.markStyle === "text" ? 1.7 : 1.35) * config.patternScale;
+    const targetHeight = frame.radius * 1.35 * config.patternScale;
+    const scale = Math.min(targetWidth / width, targetHeight / height);
+    geometry.scale(scale, scale, 1);
+    geometry.computeBoundingBox();
+    box = geometry.boundingBox!;
     geometry.translate(
       -(box.min.x + box.max.x) / 2,
       -(box.min.y + box.max.y) / 2,

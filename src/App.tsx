@@ -1,8 +1,8 @@
 import { ChangeEvent, useMemo, useState } from "react";
 import DiceScene from "./DiceScene";
 import { getDieFaceFrames } from "./diceGeometry";
-import { buildDiceStl, saveBlob } from "./stlExport";
-import type { DiceConfig, DieSides, DistributionPreset, MarkStyle } from "./types";
+import { FONT_OPTIONS } from "./fontCatalog";
+import type { DiceConfig, DieSides, DistributionPreset, FontId, MarkStyle } from "./types";
 import "./styles.css";
 
 const DIE_OPTIONS: DieSides[] = [6, 8, 10, 12, 20];
@@ -56,6 +56,8 @@ export default function App() {
     depth: 0.65,
     patternScale: 0.9,
     markStyle: "numbers",
+    font: "helvetiker-bold",
+    faceText: "LUCKY",
     randomPips: false,
     pipSeed: 2026,
     values: standardValues(20),
@@ -76,7 +78,9 @@ export default function App() {
     setConfig((current) => ({
       ...current,
       sides,
-      values: standardValues(sides),
+      values: current.markStyle === "text"
+        ? Array.from({ length: sides }, () => current.faceText || "LUCKY")
+        : standardValues(sides),
       randomPips: false,
     }));
     setPreset("standard");
@@ -105,7 +109,7 @@ export default function App() {
   const updateValue = (index: number, value: string) => {
     setConfig((current) => {
       const values = [...current.values];
-      values[index] = value.slice(0, 3);
+      values[index] = value.slice(0, config.markStyle === "text" ? 12 : 3);
       return { ...current, values };
     });
     setPreset("custom");
@@ -136,6 +140,7 @@ export default function App() {
     setExportState("building");
     const formWindow = printAfter ? window.open("about:blank", "_blank") : null;
     try {
+      const { buildDiceStl, saveBlob } = await import("./stlExport");
       const blob = await buildDiceStl(config);
       saveBlob(blob, `diceforge-d${config.sides}-${config.size}mm.stl`);
       setExportState("ready");
@@ -149,7 +154,15 @@ export default function App() {
   };
 
   const setMarkStyle = (markStyle: MarkStyle) => {
-    setConfig((current) => ({ ...current, markStyle, randomPips: false }));
+    setConfig((current) => {
+      const faceText = current.faceText || "LUCKY";
+      const values = markStyle === "text"
+        ? Array.from({ length: current.sides }, () => faceText)
+        : markStyle === "numbers" || markStyle === "pips"
+          ? standardValues(current.sides)
+          : current.values;
+      return { ...current, markStyle, values, faceText, randomPips: false };
+    });
     setPreset("custom");
     setExportState("idle");
   };
@@ -247,12 +260,42 @@ export default function App() {
           <div className="control-section faces-section">
             <div className="section-heading"><span>02</span><div><h2>Make every face yours</h2><p>Marks are cut into the printable model—not painted on.</p></div></div>
             <div className="segmented" role="group" aria-label="Face mark style">
-              {(["numbers", "pips", "graphic"] as MarkStyle[]).map((style) => (
+              {(["numbers", "pips", "text", "graphic"] as MarkStyle[]).map((style) => (
                 <button key={style} type="button" className={config.markStyle === style ? "selected" : ""} onClick={() => setMarkStyle(style)} aria-pressed={config.markStyle === style}>
                   {style === "graphic" ? "CUSTOM SVG" : style.toUpperCase()}
                 </button>
               ))}
             </div>
+
+            {(config.markStyle === "numbers" || config.markStyle === "text") && (
+              <label className="font-picker">
+                <span><b>{config.markStyle === "numbers" ? "Number font" : "Text font"}</b><small>Used in preview and STL</small></span>
+                <select value={config.font} onChange={(event) => setConfig({ ...config, font: event.target.value as FontId })}>
+                  {FONT_OPTIONS.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}
+                </select>
+              </label>
+            )}
+
+            {config.markStyle === "text" && (
+              <label className="shared-text-input">
+                <span><b>Text on every face</b><small>Up to 12 characters · edit individual faces below</small></span>
+                <input
+                  type="text"
+                  maxLength={12}
+                  value={config.faceText}
+                  placeholder="LUCKY"
+                  onChange={(event) => {
+                    const faceText = event.target.value;
+                    setConfig({
+                      ...config,
+                      faceText,
+                      values: Array.from({ length: config.sides }, () => faceText),
+                    });
+                    setPreset("custom");
+                  }}
+                />
+              </label>
+            )}
 
             {config.markStyle === "graphic" && (
               <label className="upload-box" htmlFor="graphic-upload">
@@ -263,24 +306,32 @@ export default function App() {
               </label>
             )}
 
-            <div className="preset-label"><b>Distribution</b><small>Quick layouts or edit each face</small></div>
-            <div className="preset-row">
-              {(["standard", "opposites", "random", "blank"] as DistributionPreset[]).map((option) => (
-                <button key={option} type="button" className={preset === option ? "selected" : ""} onClick={() => applyPreset(option)}>
-                  {option === "random" ? config.markStyle === "pips" ? "random pips" : "shuffle" : option}
-                </button>
-              ))}
-            </div>
+            {(config.markStyle === "numbers" || config.markStyle === "pips") && (
+              <>
+                <div className="preset-label"><b>Distribution</b><small>Quick layouts or edit each face</small></div>
+                <div className="preset-row">
+                  {(["standard", "opposites", "random", "blank"] as DistributionPreset[]).map((option) => (
+                    <button key={option} type="button" className={preset === option ? "selected" : ""} onClick={() => applyPreset(option)}>
+                      {option === "random" ? config.markStyle === "pips" ? "random pips" : "shuffle" : option}
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
 
-            <button className="face-editor-toggle" type="button" onClick={() => setShowFaces(!showFaces)} aria-expanded={showFaces}>
-              <span>EDIT {config.sides} FACE VALUES</span><span>{showFaces ? "−" : "+"}</span>
-            </button>
-            {showFaces && (
-              <div className="face-grid">
-                {config.values.map((value, index) => (
-                  <label key={index}><span>F{String(index + 1).padStart(2, "0")}</span><input aria-label={`Face ${index + 1} value`} value={value} onChange={(event) => updateValue(index, event.target.value)} /></label>
-                ))}
-              </div>
+            {config.markStyle !== "graphic" && (
+              <>
+                <button className="face-editor-toggle" type="button" onClick={() => setShowFaces(!showFaces)} aria-expanded={showFaces}>
+                  <span>EDIT {config.sides} FACE {config.markStyle === "text" ? "LABELS" : "VALUES"}</span><span>{showFaces ? "−" : "+"}</span>
+                </button>
+                {showFaces && (
+                  <div className="face-grid">
+                    {config.values.map((value, index) => (
+                      <label key={index}><span>F{String(index + 1).padStart(2, "0")}</span><input aria-label={`Face ${index + 1} value`} value={value} onChange={(event) => updateValue(index, event.target.value)} /></label>
+                    ))}
+                  </div>
+                )}
+              </>
             )}
 
             <label className="range-row depth-row">

@@ -71,6 +71,8 @@ test("exports a binary STL with debossed pips at maximum control ranges", async 
     depth: 0.55,
     patternScale: 1.8,
     markStyle: "pips",
+    font: "helvetiker-bold",
+    faceText: "LUCKY",
     randomPips: true,
     pipSeed: 42,
     values: ["1", "2", "3", "4", "5", "6"],
@@ -94,12 +96,37 @@ test("turns uploaded SVG paths into debossed geometry", async () => {
     depth: 0.55,
     patternScale: 1.1,
     markStyle: "graphic",
+    font: "helvetiker-bold",
+    faceText: "LUCKY",
     randomPips: false,
     pipSeed: 42,
     values: Array.from({ length: 8 }, (_, index) => String(index + 1)),
     color: "#ffffff",
     graphicName: "mark.svg",
     graphicData: `data:image/svg+xml;base64,${btoa(svg)}`,
+  };
+  const stl = await buildDiceStl(config);
+  assert.ok(stl.size > 10_000);
+});
+
+test("exports custom face text with a selected printable font", async () => {
+  const config: DiceConfig = {
+    sides: 8,
+    size: 22,
+    edge: 1.4,
+    sphereCut: false,
+    sphereCutAmount: 0.55,
+    depth: 0.6,
+    patternScale: 1,
+    markStyle: "text",
+    font: "gentilis-bold",
+    faceText: "LUCKY",
+    randomPips: false,
+    pipSeed: 9,
+    values: Array.from({ length: 8 }, () => "LUCKY"),
+    color: "#ffffff",
+    graphicName: "",
+    graphicData: "",
   };
   const stl = await buildDiceStl(config);
   assert.ok(stl.size > 10_000);

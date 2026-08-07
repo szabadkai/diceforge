@@ -14,6 +14,7 @@ function FaceMark({
   randomPips,
   pipSeed,
   faceIndex,
+  font,
   matrix,
   radius,
 }: {
@@ -24,12 +25,13 @@ function FaceMark({
   randomPips: boolean;
   pipSeed: number;
   faceIndex: number;
+  font: DiceConfig["font"];
   matrix: THREE.Matrix4;
   radius: number;
 }) {
   const texture = useMemo(
-    () => createMarkTexture(value, style, graphicData, patternScale, randomPips, pipSeed, faceIndex),
-    [value, style, graphicData, patternScale, randomPips, pipSeed, faceIndex],
+    () => createMarkTexture(value, style, graphicData, patternScale, randomPips, pipSeed, faceIndex, font),
+    [value, style, graphicData, patternScale, randomPips, pipSeed, faceIndex, font],
   );
 
   useEffect(() => () => texture.dispose(), [texture]);
@@ -91,6 +93,7 @@ function Die({ config }: { config: DiceConfig }) {
             randomPips={config.randomPips}
             pipSeed={config.pipSeed}
             faceIndex={index}
+            font={config.font}
             matrix={faceTransform(positioned)}
             radius={frame.radius}
           />

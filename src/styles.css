@@ -105,10 +105,18 @@ a { color: inherit; text-decoration: none; }
 .swatches button.selected { outline: 2px solid var(--orange); outline-offset: 2px; }
 
 .faces-section { border-bottom: 0; }
-.segmented, .preset-row { display: grid; grid-template-columns: repeat(3, 1fr); border: 1px solid var(--line); margin-bottom: 18px; }
+.segmented, .preset-row { display: grid; grid-template-columns: repeat(4, 1fr); border: 1px solid var(--line); margin-bottom: 18px; }
 .segmented button, .preset-row button { background: transparent; border: 0; border-right: 1px solid var(--line); height: 42px; cursor: pointer; font: 500 9px/1 "DM Mono", monospace; letter-spacing: .04em; }
 .segmented button:last-child, .preset-row button:last-child { border-right: 0; }
 .segmented button.selected { background: var(--ink); color: white; }
+.font-picker, .shared-text-input { border: 1px solid var(--line); background: #f0ede7; min-height: 64px; margin: 0 0 16px; padding: 11px 14px; display: grid; grid-template-columns: 1fr minmax(150px, .9fr); align-items: center; gap: 18px; }
+.font-picker > span, .shared-text-input > span { display: flex; flex-direction: column; gap: 4px; }
+.font-picker b, .shared-text-input b { font-size: 11px; }
+.font-picker small, .shared-text-input small { font: 400 8px/1.35 "DM Mono", monospace; color: #85877f; }
+.font-picker select, .shared-text-input input { width: 100%; height: 38px; border: 1px solid #c4c1b8; border-radius: 0; background: white; color: var(--ink); padding: 0 11px; outline: none; font: 500 10px/1 "DM Mono", monospace; }
+.font-picker select:focus, .shared-text-input input:focus { border-color: var(--orange); box-shadow: 0 0 0 1px var(--orange); }
+.shared-text-input { grid-template-columns: 1.25fr 1fr; }
+.shared-text-input input { text-transform: none; }
 .upload-box { border: 1px dashed #b2aea5; display: grid; grid-template-columns: 40px 1fr auto; gap: 14px; align-items: center; padding: 14px; cursor: pointer; margin: 16px 0 20px; background: #f0ede7; }
 .upload-box input { display: none; }
 .upload-icon { width: 34px; height: 34px; border: 1px solid var(--line); display: grid; place-items: center; font-size: 18px; color: var(--orange); }
@@ -205,6 +213,7 @@ footer > span { justify-self: end; font: 400 8px/1 "DM Mono", monospace; color: 
   .die-icon { width: 29px; height: 29px; }
   .range-row { grid-template-columns: 105px 1fr 50px; gap: 10px; }
   .face-grid { grid-template-columns: repeat(3, 1fr); }
+  .font-picker, .shared-text-input { grid-template-columns: 1fr; gap: 9px; }
   .preview-panel { height: 560px; min-height: 560px; }
   .canvas-wrap { bottom: 96px; }
   .model-stats { height: 96px; grid-template-columns: repeat(2, 1fr); }

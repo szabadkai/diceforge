@@ -1,5 +1,6 @@
 import * as THREE from "three";
-import type { MarkStyle } from "./types";
+import { getCanvasFont } from "./fontCatalog";
+import type { FontId, MarkStyle } from "./types";
 
 const PIP_LAYOUTS: Record<number, Array<[number, number]>> = {
   1: [[0, 0]],
@@ -70,6 +71,7 @@ export function createMarkTexture(
   randomPips: boolean,
   pipSeed: number,
   faceIndex: number,
+  font: FontId,
 ): THREE.CanvasTexture {
   const canvas = document.createElement("canvas");
   canvas.width = 384;
@@ -83,9 +85,11 @@ export function createMarkTexture(
     context.shadowColor = "rgba(255,255,255,.42)";
     context.shadowBlur = 3;
     context.shadowOffsetY = 4;
-    const length = value.length;
-    const baseSize = length > 2 ? 150 : length === 2 ? 190 : 230;
-    context.font = `800 ${baseSize * patternScale}px Arial, Helvetica, sans-serif`;
+    const length = Math.max(1, value.length);
+    const baseSize = style === "text"
+      ? Math.min(220, 300 / Math.max(1, length * 0.58))
+      : length > 2 ? 150 : length === 2 ? 190 : 230;
+    context.font = `800 ${baseSize * patternScale}px ${getCanvasFont(font)}`;
     context.textAlign = "center";
     context.textBaseline = "middle";
     context.fillText(value, 192, 200);
