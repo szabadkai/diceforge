@@ -274,6 +274,17 @@ export default function App() {
           <div className="preview-topline"><span>LIVE MODEL / D{config.sides}</span><span className="live-dot">● LIVE</span></div>
           <div className="canvas-wrap"><DiceScene config={config} /></div>
           <div className="orbit-note"><span>↻</span> DRAG TO ORBIT · SCROLL TO ZOOM</div>
+          <div className="quick-export">
+            {exportState === "ready" && <span className="quick-export-status">STL DOWNLOADED ✓</span>}
+            {exportState === "error" && <span className="quick-export-status error">EXPORT FAILED — TRY AGAIN</span>}
+            <button type="button" onClick={() => exportModel(false)} disabled={exportState === "building"}>
+              <span>
+                <b>{exportState === "building" ? "BUILDING STL…" : "EXPORT MODEL"}</b>
+                <small>D{config.sides} · {config.size} MM · BINARY STL</small>
+              </span>
+              <span aria-hidden="true">↓</span>
+            </button>
+          </div>
           <div className="model-stats">
             <div><span>SIZE</span><b>{config.size} mm</b></div>
             <div><span>FACES</span><b>{config.sides}</b></div>
@@ -282,7 +293,7 @@ export default function App() {
           </div>
         </div>
 
-        <div className="export-panel">
+        <div className="export-panel" id="export">
           <div className="export-copy">
             <span className="export-number">03</span>
             <div><h2>Ready to roll?</h2><p>Your model is generated locally. Nothing is uploaded until you choose a printer.</p></div>
