@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { Brush, Evaluator, INTERSECTION } from "three-bvh-csg";
 import { ConvexGeometry } from "three/examples/jsm/geometries/ConvexGeometry.js";
 import type { DieSides } from "./types";
 
@@ -171,10 +172,40 @@ function roundedConvexGeometry(sharp: THREE.BufferGeometry, requestedRadius: num
   return geometry;
 }
 
-export function createDieGeometry(sides: DieSides, size: number, edge = 1.2): THREE.BufferGeometry {
+function sphereCutGeometry(geometry: THREE.BufferGeometry, size: number, amount: number) {
+  const half = size / 2;
+  const cornerRadius = Math.sqrt(3) * half;
+  const edgeRadius = Math.sqrt(2) * half;
+  const strength = THREE.MathUtils.clamp(amount, 0, 1);
+  const sphereRadius = THREE.MathUtils.lerp(cornerRadius - 0.02, edgeRadius + 0.03, strength);
+  const dieBrush = new Brush(geometry);
+  const sphereGeometry = new THREE.SphereGeometry(sphereRadius, 48, 32);
+  const sphereBrush = new Brush(sphereGeometry);
+  dieBrush.updateMatrixWorld();
+  sphereBrush.updateMatrixWorld();
+  const evaluator = new Evaluator();
+  evaluator.attributes = ["position", "normal"];
+  const result = evaluator.evaluate(dieBrush, sphereBrush, INTERSECTION);
+  const output = result.geometry.clone();
+  sphereGeometry.dispose();
+  return output;
+}
+
+export function createDieGeometry(
+  sides: DieSides,
+  size: number,
+  edge = 1.2,
+  sphereCut = false,
+  sphereCutAmount = 0.55,
+): THREE.BufferGeometry {
   const sharp = createSharpDieGeometry(sides, size);
   const rounded = roundedConvexGeometry(sharp, edge);
   sharp.dispose();
+  if (sides === 6 && sphereCut) {
+    const cut = sphereCutGeometry(rounded, size, sphereCutAmount);
+    rounded.dispose();
+    return cut;
+  }
   return rounded;
 }
 

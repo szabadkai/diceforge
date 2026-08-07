@@ -6,6 +6,8 @@ export interface DiceConfig {
   sides: DieSides;
   size: number;
   edge: number;
+  sphereCut: boolean;
+  sphereCutAmount: number;
   depth: number;
   patternScale: number;
   markStyle: MarkStyle;

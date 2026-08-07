@@ -110,7 +110,13 @@ function makeGraphicCutters(config: DiceConfig, frames: FaceFrame[]) {
 
 export async function buildDiceStl(config: DiceConfig): Promise<Blob> {
   await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
-  const baseGeometry = createDieGeometry(config.sides, config.size, config.edge);
+  const baseGeometry = createDieGeometry(
+    config.sides,
+    config.size,
+    config.edge,
+    config.sphereCut,
+    config.sphereCutAmount,
+  );
   const frames = getDieFaceFrames(config.sides, config.size);
   let cutterGeometries: THREE.BufferGeometry[];
   if (config.markStyle === "pips") cutterGeometries = makePipCutters(config, frames);

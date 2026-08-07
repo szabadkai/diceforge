@@ -90,6 +90,15 @@ a { color: inherit; text-decoration: none; }
 .range-row input:disabled { opacity: .28; }
 .range-row output { font: 500 13px/1 "DM Mono", monospace; text-align: right; }
 .range-row output small { display: block; margin-top: 5px; }
+.toggle-row { min-height: 70px; border-top: 1px solid #ddd9d0; display: flex; align-items: center; justify-content: space-between; gap: 20px; }
+.toggle-row > span { display: flex; flex-direction: column; gap: 4px; }
+.toggle-row b { font-size: 11px; }
+.toggle-row small { font: 400 8px/1.3 "DM Mono", monospace; color: #8b8c85; letter-spacing: .04em; }
+.toggle-row button { width: 46px; height: 24px; border: 1px solid #b9b6ad; border-radius: 20px; background: #d8d5cd; padding: 3px; cursor: pointer; transition: background .2s, border-color .2s; }
+.toggle-row button i { display: block; width: 16px; height: 16px; border-radius: 50%; background: white; box-shadow: 0 1px 4px rgba(0,0,0,.2); transition: transform .2s; }
+.toggle-row button.active { background: var(--orange); border-color: var(--orange); }
+.toggle-row button.active i { transform: translateX(20px); }
+.sphere-cut-strength { background: #eeece6; margin-inline: -10px; padding-inline: 10px; }
 .color-row { min-height: 70px; border-top: 1px solid #ddd9d0; display: flex; justify-content: space-between; align-items: center; }
 .swatches { display: flex; gap: 10px; }
 .swatches button { width: 24px; height: 24px; border: 2px solid #fff; outline: 1px solid #c9c5ba; border-radius: 50%; cursor: pointer; }

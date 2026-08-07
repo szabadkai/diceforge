@@ -50,11 +50,24 @@ test("random pip layouts are seeded, irregular, and keep the requested count", (
   assert.notDeepEqual(first, nextFace);
 });
 
+test("D6 sphere boolean cuts the rounded cube corners", () => {
+  const filleted = createDieGeometry(6, 24, 1.2, false, 0.55);
+  const sphereCut = createDieGeometry(6, 24, 1.2, true, 0.55);
+  assert.notEqual(
+    filleted.getAttribute("position").count,
+    sphereCut.getAttribute("position").count,
+  );
+  filleted.dispose();
+  sphereCut.dispose();
+});
+
 test("exports a binary STL with debossed pips", async () => {
   const config: DiceConfig = {
     sides: 6,
     size: 18,
     edge: 1,
+    sphereCut: true,
+    sphereCutAmount: 0.55,
     depth: 0.55,
     patternScale: 0.9,
     markStyle: "pips",
@@ -76,6 +89,8 @@ test("turns uploaded SVG paths into debossed geometry", async () => {
     sides: 8,
     size: 20,
     edge: 1,
+    sphereCut: false,
+    sphereCutAmount: 0.55,
     depth: 0.55,
     patternScale: 1.1,
     markStyle: "graphic",

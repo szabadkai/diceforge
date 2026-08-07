@@ -1,6 +1,6 @@
 # DiceForge
 
-DiceForge is a browser-based, print-ready polyhedral dice generator. It creates D6, D8, D10, D12, and D20 models with numbers, regular or randomized pips, or an uploaded SVG mark. Every solid supports adjustable spherical corner cuts and edge fillets, face-pattern scaling, custom distributions, and true debossed geometry in the exported STL.
+DiceForge is a browser-based, print-ready polyhedral dice generator. It creates D6, D8, D10, D12, and D20 models with numbers, regular or randomized pips, or an uploaded SVG mark. Every solid supports adjustable edge fillets, face-pattern scaling, custom distributions, and true debossed geometry in the exported STL. The D6 also includes an independently adjustable sphere-boolean corner cut.
 
 ## Run locally
 

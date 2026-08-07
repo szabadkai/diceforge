@@ -45,8 +45,14 @@ function FaceMark({
 function Die({ config }: { config: DiceConfig }) {
   const group = useRef<THREE.Group>(null);
   const geometry = useMemo(
-    () => createDieGeometry(config.sides, config.size, config.edge),
-    [config.sides, config.size, config.edge],
+    () => createDieGeometry(
+      config.sides,
+      config.size,
+      config.edge,
+      config.sphereCut,
+      config.sphereCutAmount,
+    ),
+    [config.sides, config.size, config.edge, config.sphereCut, config.sphereCutAmount],
   );
   const frames = useMemo(
     () => getDieFaceFrames(config.sides, config.size),

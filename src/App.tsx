@@ -51,6 +51,8 @@ export default function App() {
     sides: 20,
     size: 24,
     edge: 1.2,
+    sphereCut: true,
+    sphereCutAmount: 0.55,
     depth: 0.65,
     patternScale: 0.9,
     markStyle: "numbers",
@@ -208,6 +210,31 @@ export default function App() {
               <input type="range" min="0.2" max={Math.min(3.2, config.size * 0.14)} step="0.1" value={config.edge} onChange={(event) => setConfig({ ...config, edge: Number(event.target.value) })} />
               <output>{config.edge.toFixed(1)}<small>mm</small></output>
             </label>
+
+            {config.sides === 6 && (
+              <>
+                <div className="toggle-row">
+                  <span><b>Sphere corner cut</b><small>BOOLEAN INTERSECTION · D6 ONLY</small></span>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={config.sphereCut}
+                    className={config.sphereCut ? "active" : ""}
+                    onClick={() => {
+                      setConfig({ ...config, sphereCut: !config.sphereCut });
+                      setExportState("idle");
+                    }}
+                  ><i /></button>
+                </div>
+                {config.sphereCut && (
+                  <label className="range-row sphere-cut-strength">
+                    <span><b>Corner cut</b><small>Sphere intersection depth</small></span>
+                    <input type="range" min="0.12" max="0.92" step="0.02" value={config.sphereCutAmount} onChange={(event) => setConfig({ ...config, sphereCutAmount: Number(event.target.value) })} />
+                    <output>{Math.round(config.sphereCutAmount * 100)}<small>%</small></output>
+                  </label>
+                )}
+              </>
+            )}
 
             <div className="color-row">
               <span><b>Preview resin</b><small>Visual only</small></span>
