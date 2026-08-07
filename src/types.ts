@@ -7,7 +7,10 @@ export interface DiceConfig {
   size: number;
   edge: number;
   depth: number;
+  patternScale: number;
   markStyle: MarkStyle;
+  randomPips: boolean;
+  pipSeed: number;
   values: string[];
   color: string;
   graphicName: string;

@@ -1,6 +1,6 @@
 import { ChangeEvent, useMemo, useState } from "react";
 import DiceScene from "./DiceScene";
-import { createDieGeometry, getFaceFrames } from "./diceGeometry";
+import { getDieFaceFrames } from "./diceGeometry";
 import { buildDiceStl, saveBlob } from "./stlExport";
 import type { DiceConfig, DieSides, DistributionPreset, MarkStyle } from "./types";
 import "./styles.css";
@@ -15,9 +15,7 @@ function standardValues(sides: DieSides) {
 }
 
 function oppositeValues(sides: DieSides) {
-  const geometry = createDieGeometry(sides, 24, 1.2);
-  const frames = getFaceFrames(geometry);
-  geometry.dispose();
+  const frames = getDieFaceFrames(sides, 24);
   const result = Array.from({ length: sides }, () => "");
   const available = new Set(frames.map((_, index) => index));
   let low = sides === 10 ? 0 : 1;
@@ -54,7 +52,10 @@ export default function App() {
     size: 24,
     edge: 1.2,
     depth: 0.65,
+    patternScale: 0.9,
     markStyle: "numbers",
+    randomPips: false,
+    pipSeed: 2026,
     values: standardValues(20),
     color: COLORS[0],
     graphicName: "",
@@ -70,20 +71,31 @@ export default function App() {
   }, [config.size, config.sides]);
 
   const selectSides = (sides: DieSides) => {
-    setConfig((current) => ({ ...current, sides, values: standardValues(sides) }));
+    setConfig((current) => ({
+      ...current,
+      sides,
+      values: standardValues(sides),
+      randomPips: false,
+    }));
     setPreset("standard");
     setExportState("idle");
   };
 
   const applyPreset = (nextPreset: DistributionPreset) => {
+    const randomPipLayout = nextPreset === "random" && config.markStyle === "pips";
     const values = nextPreset === "standard"
       ? standardValues(config.sides)
       : nextPreset === "opposites"
         ? oppositeValues(config.sides)
         : nextPreset === "random"
-          ? shuffleValues(config.sides)
+          ? randomPipLayout ? config.values : shuffleValues(config.sides)
           : Array.from({ length: config.sides }, () => "");
-    setConfig((current) => ({ ...current, values }));
+    setConfig((current) => ({
+      ...current,
+      values,
+      randomPips: randomPipLayout,
+      pipSeed: randomPipLayout ? Math.floor(Math.random() * 2_000_000_000) : current.pipSeed,
+    }));
     setPreset(nextPreset);
     setExportState("idle");
   };
@@ -135,7 +147,8 @@ export default function App() {
   };
 
   const setMarkStyle = (markStyle: MarkStyle) => {
-    setConfig((current) => ({ ...current, markStyle }));
+    setConfig((current) => ({ ...current, markStyle, randomPips: false }));
+    setPreset("custom");
     setExportState("idle");
   };
 
@@ -184,12 +197,15 @@ export default function App() {
 
             <label className="range-row">
               <span><b>Overall size</b><small>Largest dimension</small></span>
-              <input type="range" min="12" max="32" step="1" value={config.size} onChange={(event) => setConfig({ ...config, size: Number(event.target.value) })} />
+              <input type="range" min="12" max="32" step="1" value={config.size} onChange={(event) => {
+                const size = Number(event.target.value);
+                setConfig({ ...config, size, edge: Math.min(config.edge, size * 0.14) });
+              }} />
               <output>{config.size}<small>mm</small></output>
             </label>
             <label className="range-row">
               <span><b>Edge radius</b><small>Softer rolls</small></span>
-              <input type="range" min="0.3" max="2.4" step="0.1" value={config.edge} onChange={(event) => setConfig({ ...config, edge: Number(event.target.value) })} disabled={config.sides !== 6} />
+              <input type="range" min="0.2" max={Math.min(3.2, config.size * 0.14)} step="0.1" value={config.edge} onChange={(event) => setConfig({ ...config, edge: Number(event.target.value) })} />
               <output>{config.edge.toFixed(1)}<small>mm</small></output>
             </label>
 
@@ -223,7 +239,9 @@ export default function App() {
             <div className="preset-label"><b>Distribution</b><small>Quick layouts or edit each face</small></div>
             <div className="preset-row">
               {(["standard", "opposites", "random", "blank"] as DistributionPreset[]).map((option) => (
-                <button key={option} type="button" className={preset === option ? "selected" : ""} onClick={() => applyPreset(option)}>{option}</button>
+                <button key={option} type="button" className={preset === option ? "selected" : ""} onClick={() => applyPreset(option)}>
+                  {option === "random" ? config.markStyle === "pips" ? "random pips" : "shuffle" : option}
+                </button>
               ))}
             </div>
 
@@ -239,6 +257,12 @@ export default function App() {
             )}
 
             <label className="range-row depth-row">
+              <span><b>Pattern size</b><small>Scale every face mark</small></span>
+              <input type="range" min="0.5" max="1.2" step="0.05" value={config.patternScale} onChange={(event) => setConfig({ ...config, patternScale: Number(event.target.value) })} />
+              <output>{Math.round(config.patternScale * 100)}<small>%</small></output>
+            </label>
+
+            <label className="range-row">
               <span><b>Deboss depth</b><small>Recommended 0.4–0.8 mm</small></span>
               <input type="range" min="0.3" max="1.2" step="0.05" value={config.depth} onChange={(event) => setConfig({ ...config, depth: Number(event.target.value) })} />
               <output>{config.depth.toFixed(2)}<small>mm</small></output>

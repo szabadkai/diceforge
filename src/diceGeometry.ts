@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeometry.js";
+import { ConvexGeometry } from "three/examples/jsm/geometries/ConvexGeometry.js";
 import type { DieSides } from "./types";
 
 export interface FaceFrame {
@@ -28,9 +28,8 @@ function pentagonalTrapezohedron(): THREE.BufferGeometry {
       new THREE.Vector3().subVectors(c, a),
     );
     const centroid = new THREE.Vector3().add(a).add(b).add(c).multiplyScalar(1 / 3);
-    const outward = centroid.dot(normal) > 0;
-    const vertices = outward ? [a, b, c] : [a, c, b];
-    vertices.forEach((v) => positions.push(v.x, v.y, v.z));
+    const vertices = centroid.dot(normal) > 0 ? [a, b, c] : [a, c, b];
+    vertices.forEach((vertex) => positions.push(vertex.x, vertex.y, vertex.z));
   };
 
   for (let i = 0; i < 10; i += 1) {
@@ -59,27 +58,124 @@ function normalized(geometry: THREE.BufferGeometry, size: number): THREE.BufferG
   return result;
 }
 
-export function createDieGeometry(sides: DieSides, size: number, edge = 1.2): THREE.BufferGeometry {
-  let geometry: THREE.BufferGeometry;
+export function createSharpDieGeometry(sides: DieSides, size: number): THREE.BufferGeometry {
   switch (sides) {
     case 6:
-      geometry = new RoundedBoxGeometry(size, size, size, 5, Math.min(edge, size * 0.12));
-      break;
+      return new THREE.BoxGeometry(size, size, size);
     case 8:
-      geometry = normalized(new THREE.OctahedronGeometry(1, 0), size);
-      break;
+      return normalized(new THREE.OctahedronGeometry(1, 0), size);
     case 10:
-      geometry = normalized(pentagonalTrapezohedron(), size);
-      break;
+      return normalized(pentagonalTrapezohedron(), size);
     case 12:
-      geometry = normalized(new THREE.DodecahedronGeometry(1, 0), size);
-      break;
+      return normalized(new THREE.DodecahedronGeometry(1, 0), size);
     case 20:
-      geometry = normalized(new THREE.IcosahedronGeometry(1, 0), size);
-      break;
+      return normalized(new THREE.IcosahedronGeometry(1, 0), size);
   }
+}
+
+function uniqueGeometryVertices(geometry: THREE.BufferGeometry) {
+  const position = geometry.getAttribute("position");
+  const vertices: THREE.Vector3[] = [];
+  for (let index = 0; index < position.count; index += 1) {
+    const vertex = new THREE.Vector3().fromBufferAttribute(position, index);
+    if (!vertices.some((candidate) => candidate.distanceToSquared(vertex) < 0.000001)) {
+      vertices.push(vertex);
+    }
+  }
+  return vertices;
+}
+
+function insetVertex(
+  incidentFaces: FaceFrame[],
+  planeDistances: number[],
+  radius: number,
+) {
+  let xx = 0; let xy = 0; let xz = 0;
+  let yy = 0; let yz = 0; let zz = 0;
+  const right = new THREE.Vector3();
+  incidentFaces.forEach((face, index) => {
+    const { x, y, z } = face.normal;
+    const distance = planeDistances[index] - radius;
+    xx += x * x; xy += x * y; xz += x * z;
+    yy += y * y; yz += y * z; zz += z * z;
+    right.addScaledVector(face.normal, distance);
+  });
+  const matrix = new THREE.Matrix3().set(xx, xy, xz, xy, yy, yz, xz, yz, zz);
+  return right.applyMatrix3(matrix.invert());
+}
+
+function roundedConvexGeometry(sharp: THREE.BufferGeometry, requestedRadius: number) {
+  const faces = getFaceFrames(sharp);
+  const vertices = uniqueGeometryVertices(sharp);
+  const tolerance = 0.002;
+  const planeDistance = faces.map((face) => face.normal.dot(face.center));
+  const incidents = vertices.map((vertex) => faces
+    .map((face, index) => ({ face, index }))
+    .filter(({ face, index }) => Math.abs(face.normal.dot(vertex) - planeDistance[index]) < tolerance),
+  );
+
+  const edges: Array<{ a: number; b: number; faces: number[] }> = [];
+  for (let a = 0; a < vertices.length; a += 1) {
+    for (let b = a + 1; b < vertices.length; b += 1) {
+      const shared = incidents[a]
+        .map(({ index }) => index)
+        .filter((index) => incidents[b].some((candidate) => candidate.index === index));
+      if (shared.length === 2) edges.push({ a, b, faces: shared });
+    }
+  }
+
+  const minimumEdge = Math.min(...edges.map(({ a, b }) => vertices[a].distanceTo(vertices[b])));
+  const inradius = Math.min(...planeDistance);
+  const radius = Math.max(0.05, Math.min(requestedRadius, minimumEdge * 0.34, inradius * 0.46));
+  const insetVertices = incidents.map((incident) => insetVertex(
+    incident.map(({ face }) => face),
+    incident.map(({ index }) => planeDistance[index]),
+    radius,
+  ));
+  const points: THREE.Vector3[] = [];
+
+  // Original face planes remain tangent to a sphere swept around the inset solid.
+  incidents.forEach((incident, vertexIndex) => {
+    incident.forEach(({ face }) => points.push(
+      insetVertices[vertexIndex].clone().addScaledVector(face.normal, radius),
+    ));
+  });
+
+  // Three samples across each normal arc make a cylindrical edge fillet.
+  edges.forEach(({ a, b, faces: [first, second] }) => {
+    [0.25, 0.5, 0.75].forEach((mix) => {
+      const normal = faces[first].normal.clone().multiplyScalar(1 - mix)
+        .addScaledVector(faces[second].normal, mix).normalize();
+      points.push(
+        insetVertices[a].clone().addScaledVector(normal, radius),
+        insetVertices[b].clone().addScaledVector(normal, radius),
+      );
+    });
+  });
+
+  // The blended normal cap is the spherical cut at each corner (especially visible on D6).
+  incidents.forEach((incident, vertexIndex) => {
+    const cornerNormal = incident.reduce(
+      (sum, { face }) => sum.add(face.normal),
+      new THREE.Vector3(),
+    ).normalize();
+    points.push(insetVertices[vertexIndex].clone().addScaledVector(cornerNormal, radius));
+    incident.forEach(({ face }) => {
+      const blended = face.normal.clone().lerp(cornerNormal, 0.5).normalize();
+      points.push(insetVertices[vertexIndex].clone().addScaledVector(blended, radius));
+    });
+  });
+
+  const geometry = new ConvexGeometry(points);
   geometry.computeVertexNormals();
   return geometry;
+}
+
+export function createDieGeometry(sides: DieSides, size: number, edge = 1.2): THREE.BufferGeometry {
+  const sharp = createSharpDieGeometry(sides, size);
+  const rounded = roundedConvexGeometry(sharp, edge);
+  sharp.dispose();
+  return rounded;
 }
 
 export function getFaceFrames(geometry: THREE.BufferGeometry): FaceFrame[] {
@@ -117,32 +213,33 @@ export function getFaceFrames(geometry: THREE.BufferGeometry): FaceFrame[] {
     group.centroids.push(centroid);
   }
 
-  const visibleGroups = groups.length > 100
-    ? [...groups].sort((a, b) => b.area - a.area).slice(0, 6)
-    : groups;
+  return groups.map((group) => {
+    const center = group.centroids
+      .reduce((sum, point) => sum.add(point), new THREE.Vector3())
+      .multiplyScalar(1 / group.centroids.length);
+    const normal = group.normal.clone().normalize();
+    const guide = Math.abs(normal.y) < 0.86
+      ? new THREE.Vector3(0, 1, 0)
+      : new THREE.Vector3(1, 0, 0);
+    const tangent = new THREE.Vector3().crossVectors(guide, normal).normalize();
+    const bitangent = new THREE.Vector3().crossVectors(normal, tangent).normalize();
+    const uniqueVertices = group.vertices.filter((vertex, index, all) =>
+      all.findIndex((other) => other.distanceToSquared(vertex) < 0.0001) === index,
+    );
+    const radius = Math.max(...uniqueVertices.map((vertex) => vertex.distanceTo(center))) * 0.48;
+    return { center, normal, tangent, bitangent, radius };
+  }).sort((a, b) => {
+    const elevation = b.normal.y - a.normal.y;
+    if (Math.abs(elevation) > 0.02) return elevation;
+    return Math.atan2(a.normal.z, a.normal.x) - Math.atan2(b.normal.z, b.normal.x);
+  });
+}
 
-  return visibleGroups
-    .map((group) => {
-      const center = group.centroids
-        .reduce((sum, point) => sum.add(point), new THREE.Vector3())
-        .multiplyScalar(1 / group.centroids.length);
-      const normal = group.normal.clone().normalize();
-      const guide = Math.abs(normal.y) < 0.86
-        ? new THREE.Vector3(0, 1, 0)
-        : new THREE.Vector3(1, 0, 0);
-      const tangent = new THREE.Vector3().crossVectors(guide, normal).normalize();
-      const bitangent = new THREE.Vector3().crossVectors(normal, tangent).normalize();
-      const uniqueVertices = group.vertices.filter((vertex, index, all) =>
-        all.findIndex((other) => other.distanceToSquared(vertex) < 0.0001) === index,
-      );
-      const radius = Math.max(...uniqueVertices.map((vertex) => vertex.distanceTo(center))) * 0.48;
-      return { center, normal, tangent, bitangent, radius };
-    })
-    .sort((a, b) => {
-      const elevation = b.normal.y - a.normal.y;
-      if (Math.abs(elevation) > 0.02) return elevation;
-      return Math.atan2(a.normal.z, a.normal.x) - Math.atan2(b.normal.z, b.normal.x);
-    });
+export function getDieFaceFrames(sides: DieSides, size: number) {
+  const sharp = createSharpDieGeometry(sides, size);
+  const frames = getFaceFrames(sharp);
+  sharp.dispose();
+  return frames;
 }
 
 export function faceTransform(frame: FaceFrame): THREE.Matrix4 {

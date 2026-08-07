@@ -2,7 +2,7 @@ import { ContactShadows, OrbitControls } from "@react-three/drei";
 import { Canvas, useFrame } from "@react-three/fiber";
 import { Suspense, useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
-import { createDieGeometry, faceTransform, getFaceFrames } from "./diceGeometry";
+import { createDieGeometry, faceTransform, getDieFaceFrames } from "./diceGeometry";
 import { createMarkTexture } from "./markTexture";
 import type { DiceConfig } from "./types";
 
@@ -10,18 +10,26 @@ function FaceMark({
   value,
   style,
   graphicData,
+  patternScale,
+  randomPips,
+  pipSeed,
+  faceIndex,
   matrix,
   radius,
 }: {
   value: string;
   style: DiceConfig["markStyle"];
   graphicData: string;
+  patternScale: number;
+  randomPips: boolean;
+  pipSeed: number;
+  faceIndex: number;
   matrix: THREE.Matrix4;
   radius: number;
 }) {
   const texture = useMemo(
-    () => createMarkTexture(value, style, graphicData),
-    [value, style, graphicData],
+    () => createMarkTexture(value, style, graphicData, patternScale, randomPips, pipSeed, faceIndex),
+    [value, style, graphicData, patternScale, randomPips, pipSeed, faceIndex],
   );
 
   useEffect(() => () => texture.dispose(), [texture]);
@@ -40,7 +48,10 @@ function Die({ config }: { config: DiceConfig }) {
     () => createDieGeometry(config.sides, config.size, config.edge),
     [config.sides, config.size, config.edge],
   );
-  const frames = useMemo(() => getFaceFrames(geometry), [geometry]);
+  const frames = useMemo(
+    () => getDieFaceFrames(config.sides, config.size),
+    [config.sides, config.size],
+  );
 
   useEffect(() => () => geometry.dispose(), [geometry]);
 
@@ -66,10 +77,14 @@ function Die({ config }: { config: DiceConfig }) {
         const positioned = { ...frame, center: offset };
         return (
           <FaceMark
-            key={`${config.sides}-${index}-${config.values[index]}`}
+            key={`${config.sides}-${index}-${config.values[index]}-${config.pipSeed}`}
             value={config.values[index] || ""}
             style={config.markStyle}
             graphicData={config.graphicData}
+            patternScale={config.patternScale}
+            randomPips={config.randomPips}
+            pipSeed={config.pipSeed}
+            faceIndex={index}
             matrix={faceTransform(positioned)}
             radius={frame.radius}
           />
