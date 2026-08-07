@@ -61,15 +61,15 @@ test("D6 sphere boolean cuts the rounded cube corners", () => {
   sphereCut.dispose();
 });
 
-test("exports a binary STL with debossed pips", async () => {
+test("exports a binary STL with debossed pips at maximum control ranges", async () => {
   const config: DiceConfig = {
     sides: 6,
     size: 18,
-    edge: 1,
+    edge: 4.8,
     sphereCut: true,
-    sphereCutAmount: 0.55,
+    sphereCutAmount: 1.38,
     depth: 0.55,
-    patternScale: 0.9,
+    patternScale: 1.8,
     markStyle: "pips",
     randomPips: true,
     pipSeed: 42,

@@ -201,13 +201,13 @@ export default function App() {
               <span><b>Overall size</b><small>Largest dimension</small></span>
               <input type="range" min="12" max="32" step="1" value={config.size} onChange={(event) => {
                 const size = Number(event.target.value);
-                setConfig({ ...config, size, edge: Math.min(config.edge, size * 0.14) });
+                setConfig({ ...config, size, edge: Math.min(config.edge, size * 0.21) });
               }} />
               <output>{config.size}<small>mm</small></output>
             </label>
             <label className="range-row">
               <span><b>Edge radius</b><small>Softer rolls</small></span>
-              <input type="range" min="0.2" max={Math.min(3.2, config.size * 0.14)} step="0.1" value={config.edge} onChange={(event) => setConfig({ ...config, edge: Number(event.target.value) })} />
+              <input type="range" min="0.2" max={Math.min(4.8, config.size * 0.21)} step="0.1" value={config.edge} onChange={(event) => setConfig({ ...config, edge: Number(event.target.value) })} />
               <output>{config.edge.toFixed(1)}<small>mm</small></output>
             </label>
 
@@ -229,7 +229,7 @@ export default function App() {
                 {config.sphereCut && (
                   <label className="range-row sphere-cut-strength">
                     <span><b>Corner cut</b><small>Sphere intersection depth</small></span>
-                    <input type="range" min="0.12" max="0.92" step="0.02" value={config.sphereCutAmount} onChange={(event) => setConfig({ ...config, sphereCutAmount: Number(event.target.value) })} />
+                    <input type="range" min="0.12" max="1.38" step="0.02" value={config.sphereCutAmount} onChange={(event) => setConfig({ ...config, sphereCutAmount: Number(event.target.value) })} />
                     <output>{Math.round(config.sphereCutAmount * 100)}<small>%</small></output>
                   </label>
                 )}
@@ -285,7 +285,7 @@ export default function App() {
 
             <label className="range-row depth-row">
               <span><b>Pattern size</b><small>Scale every face mark</small></span>
-              <input type="range" min="0.5" max="1.2" step="0.05" value={config.patternScale} onChange={(event) => setConfig({ ...config, patternScale: Number(event.target.value) })} />
+              <input type="range" min="0.5" max="1.8" step="0.05" value={config.patternScale} onChange={(event) => setConfig({ ...config, patternScale: Number(event.target.value) })} />
               <output>{Math.round(config.patternScale * 100)}<small>%</small></output>
             </label>
 

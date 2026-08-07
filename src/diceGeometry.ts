@@ -127,7 +127,7 @@ function roundedConvexGeometry(sharp: THREE.BufferGeometry, requestedRadius: num
 
   const minimumEdge = Math.min(...edges.map(({ a, b }) => vertices[a].distanceTo(vertices[b])));
   const inradius = Math.min(...planeDistance);
-  const radius = Math.max(0.05, Math.min(requestedRadius, minimumEdge * 0.34, inradius * 0.46));
+  const radius = Math.max(0.05, Math.min(requestedRadius, minimumEdge * 0.51, inradius * 0.69));
   const insetVertices = incidents.map((incident) => insetVertex(
     incident.map(({ face }) => face),
     incident.map(({ index }) => planeDistance[index]),
@@ -176,7 +176,7 @@ function sphereCutGeometry(geometry: THREE.BufferGeometry, size: number, amount:
   const half = size / 2;
   const cornerRadius = Math.sqrt(3) * half;
   const edgeRadius = Math.sqrt(2) * half;
-  const strength = THREE.MathUtils.clamp(amount, 0, 1);
+  const strength = THREE.MathUtils.clamp(amount, 0, 1.5);
   const sphereRadius = THREE.MathUtils.lerp(cornerRadius - 0.02, edgeRadius + 0.03, strength);
   const dieBrush = new Brush(geometry);
   const sphereGeometry = new THREE.SphereGeometry(sphereRadius, 48, 32);
