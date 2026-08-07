@@ -186,12 +186,6 @@ export default function App() {
       </section>
 
       <section className="forge-shell" aria-label="Dice model generator">
-        <div className="steps" aria-label="Generator steps">
-          <span className="active">01 / BODY</span>
-          <span>02 / FACES</span>
-          <span>03 / EXPORT</span>
-        </div>
-
         <div className="config-panel">
           <div className="control-section">
             <div className="section-heading"><span>01</span><div><h2>Choose your solid</h2><p>Five balanced polyhedra, sized for real-world play.</p></div></div>
