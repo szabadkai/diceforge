@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { readdirSync, readFileSync } from "node:fs";
 import test from "node:test";
 import { DOMParser } from "@xmldom/xmldom";
+import { Vector3 } from "three";
 import {
   createDieGeometry,
   fitCenteredRectangle,
@@ -254,6 +255,43 @@ test("preview cache tracks printable settings but ignores preview color", () => 
   assert.notEqual(printableConfigKey(config), printableConfigKey({ ...config, patternScale: 1.05 }));
   assert.notEqual(printableConfigKey(config), printableConfigKey({ ...config, pipSize: 1.5 }));
   assert.notEqual(printableConfigKey(config), printableConfigKey({ ...config, graphicDataSet: ["theme-mark"] }));
+  assert.notEqual(printableConfigKey(config), printableConfigKey({ ...config, bladeSupports: true }));
+  assert.notEqual(printableConfigKey(config), printableConfigKey({ ...config, bladeSupportWidth: 0.8 }));
+});
+
+test("blade supports orient every die onto a watertight Z=0 support base", async () => {
+  for (const sides of [6, 8, 10, 12, 20] as DieSides[]) {
+    const config: DiceConfig = {
+      sides,
+      size: 24,
+      edge: 1.2,
+      sphereCut: sides === 6,
+      sphereCutAmount: 0.55,
+      depth: 0.65,
+      pipSize: 1.3,
+      patternScale: 0.9,
+      markStyle: "numbers",
+      font: "helvetiker-bold",
+      faceText: "",
+      randomPips: false,
+      pipSeed: 42,
+      values: Array.from({ length: sides }, () => ""),
+      color: "#ffffff",
+      graphicName: "",
+      graphicData: "",
+      bladeSupports: true,
+      bladeSupportWidth: sides === 20 ? 0.8 : 0.35,
+    };
+    const stl = await buildDiceStl(config);
+    await assertWatertight(stl, `D${sides} blade-supported STL`);
+    const geometry = await parseDiceStl(stl);
+    geometry.computeBoundingBox();
+    assert.ok(Math.abs(geometry.boundingBox!.min.z) < 0.0001, `D${sides} supports must sit on Z=0`);
+    assert.ok(geometry.boundingBox!.max.z > config.size, `D${sides} must be lifted above its support base`);
+    const dimensions = geometry.boundingBox!.getSize(new Vector3());
+    assert.ok(Math.max(dimensions.x, dimensions.y, dimensions.z) < config.size * 2.2, `D${sides} support layout must remain compact`);
+    geometry.dispose();
+  }
 });
 
 test("D6 sphere boolean cuts the rounded cube corners", () => {

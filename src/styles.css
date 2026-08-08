@@ -98,6 +98,8 @@ a { color: inherit; text-decoration: none; }
 .toggle-row button.active { background: var(--orange); border-color: var(--orange); }
 .toggle-row button.active i { transform: translateX(20px); }
 .sphere-cut-strength { background: #eeece6; margin-inline: -10px; padding-inline: 10px; }
+.blade-support-toggle { background: #eefbd4; margin: 0 -10px -1px; padding: 0 10px; border-bottom: 1px solid #d7ddca; }
+.blade-support-width { background: #f4f9e9; margin: 0 -10px -1px; padding: 0 10px; }
 .color-row { min-height: 70px; border-top: 1px solid #ddd9d0; display: flex; justify-content: space-between; align-items: center; }
 .swatches { display: flex; gap: 10px; }
 .swatches button { width: 24px; height: 24px; border: 2px solid #fff; outline: 1px solid #c9c5ba; border-radius: 50%; cursor: pointer; }

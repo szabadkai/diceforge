@@ -30,6 +30,7 @@ function Die({ config, onBuildStart, onModelReady, onBuildError }: DiceSceneProp
         const { buildDiceStl, parseDiceStl } = await import("./stlExport");
         const stl = await buildDiceStl(config);
         const nextGeometry = await parseDiceStl(stl);
+        nextGeometry.computeBoundingBox();
         if (cancelled || currentGeneration !== generation.current) {
           nextGeometry.dispose();
           return;
@@ -68,10 +69,20 @@ function Die({ config, onBuildStart, onModelReady, onBuildError }: DiceSceneProp
     group.current.position.y = Math.sin(state.clock.elapsedTime * 0.7) * 0.12;
   });
 
+  const meshPosition = geometry && config.bladeSupports
+    ? geometry.boundingBox?.getCenter(new THREE.Vector3()).negate() ?? new THREE.Vector3()
+    : new THREE.Vector3();
+
   return (
-    <group ref={group} rotation={[0.38, -0.55, -0.08]}>
+    <group ref={group} rotation={config.bladeSupports ? [-1.18, 0, -0.18] : [0.38, -0.55, -0.08]}>
       {geometry && (
-        <mesh geometry={geometry} castShadow receiveShadow>
+        <mesh
+          geometry={geometry}
+          position={meshPosition}
+          scale={config.bladeSupports ? 0.62 : 1}
+          castShadow
+          receiveShadow
+        >
           <meshPhysicalMaterial
             color={config.color}
             roughness={0.38}

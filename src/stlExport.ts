@@ -4,6 +4,7 @@ import { STLExporter } from "three/examples/jsm/exporters/STLExporter.js";
 import { STLLoader } from "three/examples/jsm/loaders/STLLoader.js";
 import { TextGeometry } from "three/examples/jsm/geometries/TextGeometry.js";
 import { SVGLoader } from "three/examples/jsm/loaders/SVGLoader.js";
+import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import {
   createDieGeometry,
   faceTransform,
@@ -17,6 +18,7 @@ import { getFont } from "./stlFonts";
 import { pipLayout } from "./markTexture";
 import { createSphericalPipCutter, sphericalPipDimensions } from "./pipGeometry";
 import type { DiceConfig } from "./types";
+import { createBladeSupportLayout, placeBladeSupportsOnSlicerPlatform } from "./bladeSupports";
 
 type LoadedManifoldModule = Awaited<ReturnType<typeof ManifoldModule>>;
 type ManifoldSolid = InstanceType<LoadedManifoldModule["Manifold"]>;
@@ -240,6 +242,7 @@ export async function buildDiceStl(config: DiceConfig): Promise<Blob> {
 
   const ownedSolids: ManifoldSolid[] = [];
   let outputGeometry: THREE.BufferGeometry | undefined;
+  let supportedOutputGeometry: THREE.BufferGeometry | undefined;
   try {
     let result = geometryToManifold(manifold, baseGeometry);
     ownedSolids.push(result);
@@ -266,7 +269,34 @@ export async function buildDiceStl(config: DiceConfig): Promise<Blob> {
       throw new Error(`Printable mesh validation failed: ${result.status()}`);
     }
 
-    outputGeometry = manifoldToGeometry(result);
+    if (config.bladeSupports) {
+      const finishedBody = manifoldToGeometry(result);
+      const layout = createBladeSupportLayout(
+        finishedBody,
+        config.sides,
+        config.size,
+        config.bladeSupportWidth,
+      );
+      finishedBody.dispose();
+      const orientedBody = geometryToManifold(manifold, layout.bodyGeometry);
+      const supportSolids = layout.supportGeometries.map((geometry) => geometryToManifold(manifold, geometry));
+      ownedSolids.push(orientedBody, ...supportSolids);
+      layout.bodyGeometry.dispose();
+      layout.supportGeometries.forEach((geometry) => geometry.dispose());
+      const invalidSupport = supportSolids.find((solid) => solid.status() !== "NoError" || solid.isEmpty());
+      if (invalidSupport) {
+        throw new Error(`Blade support generation failed: ${invalidSupport.status()}`);
+      }
+      const indexedParts = [orientedBody, ...supportSolids].map(manifoldToGeometry);
+      const parts = indexedParts.map((geometry) => geometry.toNonIndexed());
+      supportedOutputGeometry = mergeGeometries(parts, false) ?? undefined;
+      indexedParts.forEach((geometry) => geometry.dispose());
+      parts.forEach((geometry) => geometry.dispose());
+      if (!supportedOutputGeometry) throw new Error("Blade support mesh merge failed");
+    }
+
+    outputGeometry = supportedOutputGeometry ?? manifoldToGeometry(result);
+    if (config.bladeSupports) placeBladeSupportsOnSlicerPlatform(outputGeometry);
     const exporter = new STLExporter();
     const bytes = exporter.parse(new THREE.Mesh(outputGeometry), { binary: true }) as DataView;
     return new Blob([bytes.buffer as ArrayBuffer], { type: "model/stl" });

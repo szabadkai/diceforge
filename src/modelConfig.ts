@@ -18,5 +18,7 @@ export function printableConfigKey(config: DiceConfig) {
     config.graphicData,
     config.graphicSetId,
     config.graphicDataSet,
+    Boolean(config.bladeSupports),
+    config.bladeSupportWidth ?? 0.35,
   ]);
 }

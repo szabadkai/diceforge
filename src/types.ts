@@ -40,4 +40,6 @@ export interface DiceConfig {
   graphicSetId?: string;
   graphicDataSet?: string[];
   graphicNames?: string[];
+  bladeSupports?: boolean;
+  bladeSupportWidth?: number;
 }

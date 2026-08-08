@@ -83,6 +83,8 @@ export default function App() {
     graphicSetId: "",
     graphicDataSet: [],
     graphicNames: [],
+    bladeSupports: false,
+    bladeSupportWidth: 0.35,
   });
   const [preset, setPreset] = useState<DistributionPreset | "custom">("standard");
   const [textPreset, setTextPreset] = useState<TextPresetId | "custom">("custom");
@@ -127,6 +129,7 @@ export default function App() {
   }, [config.size, config.sides]);
 
   const customWords = useMemo(() => splitFaceWords(customText), [customText]);
+  const exportFilename = `diceforge-d${config.sides}-${config.size}mm${config.bladeSupports ? "-blade-supported" : ""}.stl`;
 
   const selectSides = (sides: DieSides) => {
     setConfig((current) => ({
@@ -267,7 +270,7 @@ export default function App() {
     setExportState("building");
     try {
       const { saveBlob } = await import("./stlExport");
-      saveBlob(previewStl, `diceforge-d${config.sides}-${config.size}mm.stl`);
+      saveBlob(previewStl, exportFilename);
       setExportState("ready");
       if (showPrintOptions) setShowPrintHandoff(true);
     } catch (error) {
@@ -616,12 +619,40 @@ export default function App() {
               <input type="range" min="0.3" max={config.markStyle === "pips" ? Math.min(1.2, config.pipSize * 0.5) : 1.2} step="0.05" value={config.depth} onChange={(event) => setConfig({ ...config, depth: Number(event.target.value) })} />
               <output>{config.depth.toFixed(2)}<small>mm</small></output>
             </label>
+
+            <div className="toggle-row blade-support-toggle">
+              <span><b>Blade supports</b><small>AUTO ORIENT · EDGE FINS · Z=0 FEET</small></span>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={Boolean(config.bladeSupports)}
+                className={config.bladeSupports ? "active" : ""}
+                onClick={() => {
+                  setConfig({ ...config, bladeSupports: !config.bladeSupports });
+                  setExportState("idle");
+                }}
+              ><i /></button>
+            </div>
+            {config.bladeSupports && (
+              <label className="range-row blade-support-width">
+                <span><b>Support width</b><small>0.35 resin · 0.8+ FDM</small></span>
+                <input
+                  type="range"
+                  min="0.3"
+                  max="1.2"
+                  step="0.05"
+                  value={config.bladeSupportWidth ?? 0.35}
+                  onChange={(event) => setConfig({ ...config, bladeSupportWidth: Number(event.target.value) })}
+                />
+                <output>{(config.bladeSupportWidth ?? 0.35).toFixed(2)}<small>mm</small></output>
+              </label>
+            )}
           </div>
         </div>
 
         <div className="preview-panel">
           <div className="preview-topline">
-            <span>STL MODEL / D{config.sides}</span>
+            <span>STL MODEL / D{config.sides}{config.bladeSupports ? " / SUPPORTED" : ""}</span>
             <span className={`live-dot ${visiblePreviewState}`}>
               {visiblePreviewState === "building" ? "● BUILDING" : visiblePreviewState === "error" ? "● ERROR" : "● EXACT STL"}
             </span>
@@ -641,7 +672,7 @@ export default function App() {
             <button type="button" onClick={() => exportModel(false)} disabled={exportState === "building" || visiblePreviewState !== "ready"}>
               <span>
                 <b>{visiblePreviewState === "building" ? "BUILDING STL…" : exportState === "building" ? "PREPARING DOWNLOAD…" : "EXPORT MODEL"}</b>
-                <small>D{config.sides} · {config.size} MM · BINARY STL</small>
+                <small>D{config.sides} · {config.size} MM · {config.bladeSupports ? "BLADE SUPPORTED" : "BINARY STL"}</small>
               </span>
               <span aria-hidden="true">↓</span>
             </button>
@@ -650,7 +681,7 @@ export default function App() {
             <div><span>SIZE</span><b>{config.size} mm</b></div>
             <div><span>FACES</span><b>{config.sides}</b></div>
             <div><span>EST. VOLUME</span><b>{estimatedVolume} cm³</b></div>
-            <div><span>FORMAT</span><b>STL / MM</b></div>
+            <div><span>FORMAT</span><b>{config.bladeSupports ? "STL / BLADES" : "STL / MM"}</b></div>
           </div>
         </div>
 
@@ -677,7 +708,7 @@ export default function App() {
             <button className="handoff-close" type="button" aria-label="Close print options" onClick={() => setShowPrintHandoff(false)}>×</button>
             <span className="handoff-kicker">STL DOWNLOADED ✓</span>
             <h2 id="handoff-title">Your die is ready to quote.</h2>
-            <p>Upload <b>diceforge-d{config.sides}-{config.size}mm.stl</b> on Form Now to choose a material and finish. Form Now currently ships within the United States.</p>
+            <p>Upload <b>{exportFilename}</b> on Form Now to choose a material and finish. Form Now currently ships within the United States.</p>
             <div className="handoff-actions">
               <a href={FORM_NOW_URL} target="_blank" rel="noreferrer">OPEN FORM NOW <span>↗</span></a>
               <button type="button" onClick={() => setShowPrintHandoff(false)}>NOT NOW</button>
@@ -706,7 +737,7 @@ export default function App() {
           <div className="support-quickstart" aria-label="Resin printing quick start">
             <div><span>PROCESS</span><b>Resin / SLA</b><small>Best for small marks</small></div>
             <div><span>LAYER</span><b>0.03–0.05 mm</b><small>Start at 0.05 mm</small></div>
-            <div><span>ORIENTATION</span><b>30–45° tilt</b><small>Tilt on two axes</small></div>
+            <div><span>ORIENTATION</span><b>Tip-down</b><small>Auto with blade supports</small></div>
             <div><span>MODEL</span><b>Keep it solid</b><small>Import in millimeters</small></div>
           </div>
 
@@ -724,18 +755,18 @@ export default function App() {
               <section id="prepare-model">
                 <span className="chapter-number">01 / BEFORE SLICING</span>
                 <h3>Prepare the model at full size.</h3>
-                <p>DiceForge exports a solid STL in millimeters. Import it at 100% scale and check the displayed dimensions against the size you chose. Do not hollow a die: a hollow shell can trap resin, deform during curing, and make the weight less predictable.</p>
+                <p>DiceForge exports a solid STL in millimeters. Import it at 100% scale and check the displayed dimensions against the size you chose. Enable Blade supports for a tip-down, Z=0 model with edge fins and rail feet. Do not hollow a die: a hollow shell can trap resin, deform during curing, and make the weight less predictable.</p>
                 <div className="support-callout"><b>Do one calibration first.</b><p>Use the resin maker’s tested profile. If fine recesses print narrow or partly closed, calibrate exposure before changing the model.</p></div>
               </section>
 
               <section id="orient-die">
                 <span className="chapter-number">02 / ORIENTATION</span>
                 <h3>Make the cross-section grow gradually.</h3>
-                <p>Start with a 30–45° tilt, then rotate the die on a second axis. No broad face should sit parallel to the build plate. Aim a corner or short edge toward the plate and keep the face you care about most pointing up and away from the supports.</p>
+                <p>The Blade supports option automatically aims a vertex—or the D10 pole—toward the plate so the cross-section begins at one minimum and grows gradually. For an unsupported STL, start with a 30–45° compound tilt and keep broad faces away from the build plate.</p>
                 <ul>
                   <li>Scrub through the layer preview. Each new island needs support.</li>
                   <li>Avoid sudden, full-face layers; their higher peel load can pull the print out of shape.</li>
-                  <li>There is no universal perfect angle—rotate until the layer area grows smoothly for your chosen die.</li>
+                  <li>Printer and resin profiles still differ; inspect the generated orientation in your slicer before printing.</li>
                 </ul>
                 <div className="angle-sketch" aria-label="Recommended die orientation diagram">
                   <span className="build-plate">BUILD PLATE</span>
@@ -748,12 +779,12 @@ export default function App() {
               <section id="support-die">
                 <span className="chapter-number">03 / SUPPORTS</span>
                 <h3>Support edges, not artwork.</h3>
-                <p>Use medium contacts around the first corner or edge to lock the die in place. Continue upward with smaller contacts distributed along downward-facing edges and corners. Add enough bracing that the model cannot flex during peeling.</p>
+                <p>Generated blade supports place continuous fins beneath the spoke edges that begin at the first printed tip, then join them to low rail feet. Later perimeter edges are omitted because the solid layers below already carry them. Set the width near 0.35 mm for resin or 0.8 mm and above for a multi-line FDM wall.</p>
                 <div className="do-dont-grid">
-                  <div><span>DO</span><b>Spread small contact points</b><p>Several light supports leave shallower marks and control movement better than a few oversized tips.</p></div>
+                  <div><span>DO</span><b>Inspect every generated fin</b><p>Scrub the slicer layers and confirm the rails sit flat, the first tip is anchored, and no new island appears unsupported.</p></div>
                   <div><span>AVOID</span><b>Tips inside marks or on face centers</b><p>Supports in numbers, pips, and broad cosmetic areas are difficult to remove without visible craters.</p></div>
                 </div>
-                <p className="fine-note">Automatic supports are a starting point. Inspect the first contact area, every island, and long unsupported edges manually before slicing.</p>
+                <p className="fine-note">The blade layout is a geometry-aware starting point. Resin, exposure, lift speed, and printer mechanics still matter, so inspect the layer preview and run a calibration die before committing a full set.</p>
               </section>
 
               <section className="settings-section" aria-labelledby="settings-title">
