@@ -19,6 +19,60 @@ globalThis.requestAnimationFrame = ((callback: FrameRequestCallback) => {
 }) as typeof requestAnimationFrame;
 globalThis.DOMParser = DOMParser as unknown as typeof globalThis.DOMParser;
 
+async function auditBinaryStl(stl: Blob) {
+  const view = new DataView(await stl.arrayBuffer());
+  const triangleCount = view.getUint32(80, true);
+  const edges = new Map<string, number>();
+  let signedVolume = 0;
+  let degenerateTriangles = 0;
+  const key = (point: number[]) => point.map((value) => Math.round(value * 100_000)).join(",");
+
+  for (let triangle = 0; triangle < triangleCount; triangle += 1) {
+    const offset = 84 + triangle * 50;
+    const points = [0, 1, 2].map((corner) => [
+      view.getFloat32(offset + 12 + corner * 12, true),
+      view.getFloat32(offset + 16 + corner * 12, true),
+      view.getFloat32(offset + 20 + corner * 12, true),
+    ]);
+    const [a, b, c] = points;
+    const ab = b.map((value, axis) => value - a[axis]);
+    const ac = c.map((value, axis) => value - a[axis]);
+    const cross = [
+      ab[1] * ac[2] - ab[2] * ac[1],
+      ab[2] * ac[0] - ab[0] * ac[2],
+      ab[0] * ac[1] - ab[1] * ac[0],
+    ];
+    if (Math.hypot(...cross) < 0.000000000001) degenerateTriangles += 1;
+    signedVolume += (
+      a[0] * (b[1] * c[2] - b[2] * c[1])
+      + a[1] * (b[2] * c[0] - b[0] * c[2])
+      + a[2] * (b[0] * c[1] - b[1] * c[0])
+    ) / 6;
+
+    [[a, b], [b, c], [c, a]].forEach(([start, end]) => {
+      const startKey = key(start);
+      const endKey = key(end);
+      const edgeKey = startKey < endKey ? `${startKey}|${endKey}` : `${endKey}|${startKey}`;
+      edges.set(edgeKey, (edges.get(edgeKey) || 0) + 1);
+    });
+  }
+
+  return {
+    triangleCount,
+    signedVolume,
+    degenerateTriangles,
+    nonManifoldEdges: [...edges.values()].filter((uses) => uses !== 2).length,
+  };
+}
+
+async function assertWatertight(stl: Blob) {
+  const audit = await auditBinaryStl(stl);
+  assert.ok(audit.triangleCount > 0);
+  assert.ok(audit.signedVolume > 0, "triangle winding must produce a positive enclosed volume");
+  assert.equal(audit.degenerateTriangles, 0, "STL must not contain zero-area triangles");
+  assert.equal(audit.nonManifoldEdges, 0, "every STL edge must be shared by exactly two triangles");
+}
+
 for (const sides of [6, 8, 10, 12, 20] as DieSides[]) {
   test(`D${sides} has ${sides} usable faces`, () => {
     const frames = getDieFaceFrames(sides, 24);
@@ -121,6 +175,7 @@ test("exports a binary STL with debossed pips at maximum control ranges", async 
   const stl = await buildDiceStl(config);
   assert.equal(stl.type, "model/stl");
   assert.ok(stl.size > 100_000);
+  await assertWatertight(stl);
 });
 
 test("turns uploaded SVG paths into debossed geometry", async () => {
@@ -145,6 +200,7 @@ test("turns uploaded SVG paths into debossed geometry", async () => {
   };
   const stl = await buildDiceStl(config);
   assert.ok(stl.size > 10_000);
+  await assertWatertight(stl);
 });
 
 test("exports custom face text with a selected printable font", async () => {
@@ -168,4 +224,29 @@ test("exports custom face text with a selected printable font", async () => {
   };
   const stl = await buildDiceStl(config);
   assert.ok(stl.size > 10_000);
+  await assertWatertight(stl);
+});
+
+test("exports a watertight numbered STL for every die type", async () => {
+  for (const sides of [6, 8, 10, 12, 20] as DieSides[]) {
+    const config: DiceConfig = {
+      sides,
+      size: 24,
+      edge: 1.2,
+      sphereCut: sides === 6,
+      sphereCutAmount: 0.55,
+      depth: 0.65,
+      patternScale: 1.8,
+      markStyle: "numbers",
+      font: "orbitron-bold",
+      faceText: "LUCKY",
+      randomPips: false,
+      pipSeed: 42,
+      values: Array.from({ length: sides }, (_, index) => String(index + 1)),
+      color: "#ffffff",
+      graphicName: "",
+      graphicData: "",
+    };
+    await assertWatertight(await buildDiceStl(config));
+  }
 });

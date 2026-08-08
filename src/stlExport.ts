@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { Brush, Evaluator, SUBTRACTION } from "three-bvh-csg";
+import ManifoldModule from "manifold-3d";
 import { STLExporter } from "three/examples/jsm/exporters/STLExporter.js";
 import { TextGeometry } from "three/examples/jsm/geometries/TextGeometry.js";
 import { SVGLoader } from "three/examples/jsm/loaders/SVGLoader.js";
@@ -8,6 +8,7 @@ import {
   createDieGeometry,
   faceTransform,
   fitCenteredRectangle,
+  getD6SphereCutRadius,
   getDieFaceFrames,
   patternFillScale,
 } from "./diceGeometry";
@@ -15,6 +16,93 @@ import type { FaceFrame } from "./diceGeometry";
 import { getFont } from "./stlFonts";
 import { pipLayout } from "./markTexture";
 import type { DiceConfig } from "./types";
+
+type LoadedManifoldModule = Awaited<ReturnType<typeof ManifoldModule>>;
+type ManifoldSolid = InstanceType<LoadedManifoldModule["Manifold"]>;
+
+let manifoldModulePromise: Promise<LoadedManifoldModule> | undefined;
+
+function loadManifold() {
+  if (!manifoldModulePromise) {
+    manifoldModulePromise = ManifoldModule().then((module) => {
+      module.setup();
+      return module;
+    });
+  }
+  return manifoldModulePromise;
+}
+
+function geometryToManifold(module: LoadedManifoldModule, geometry: THREE.BufferGeometry) {
+  const position = geometry.getAttribute("position");
+  const index = geometry.index;
+  const vertexMap = new Map<string, number>();
+  const oldToNew: number[] = [];
+  const vertices: number[] = [];
+
+  for (let vertexIndex = 0; vertexIndex < position.count; vertexIndex += 1) {
+    const x = position.getX(vertexIndex);
+    const y = position.getY(vertexIndex);
+    const z = position.getZ(vertexIndex);
+    const key = `${Math.round(x * 100_000)},${Math.round(y * 100_000)},${Math.round(z * 100_000)}`;
+    let weldedIndex = vertexMap.get(key);
+    if (weldedIndex === undefined) {
+      weldedIndex = vertices.length / 3;
+      vertexMap.set(key, weldedIndex);
+      vertices.push(x, y, z);
+    }
+    oldToNew[vertexIndex] = weldedIndex;
+  }
+
+  const triangles: number[] = [];
+  let signedVolume = 0;
+  const cornerCount = index ? index.count : position.count;
+  for (let corner = 0; corner < cornerCount; corner += 3) {
+    const sourceA = index ? index.getX(corner) : corner;
+    const sourceB = index ? index.getX(corner + 1) : corner + 1;
+    const sourceC = index ? index.getX(corner + 2) : corner + 2;
+    const a = oldToNew[sourceA];
+    const b = oldToNew[sourceB];
+    const c = oldToNew[sourceC];
+    if (a === b || b === c || c === a) continue;
+    triangles.push(a, b, c);
+    const ax = vertices[a * 3]; const ay = vertices[a * 3 + 1]; const az = vertices[a * 3 + 2];
+    const bx = vertices[b * 3]; const by = vertices[b * 3 + 1]; const bz = vertices[b * 3 + 2];
+    const cx = vertices[c * 3]; const cy = vertices[c * 3 + 1]; const cz = vertices[c * 3 + 2];
+    signedVolume += (
+      ax * (by * cz - bz * cy)
+      + ay * (bz * cx - bx * cz)
+      + az * (bx * cy - by * cx)
+    ) / 6;
+  }
+
+  if (signedVolume < 0) {
+    for (let triangle = 0; triangle < triangles.length; triangle += 3) {
+      [triangles[triangle + 1], triangles[triangle + 2]] = [triangles[triangle + 2], triangles[triangle + 1]];
+    }
+  }
+
+  const mesh = new module.Mesh({
+    numProp: 3,
+    vertProperties: new Float32Array(vertices),
+    triVerts: new Uint32Array(triangles),
+  });
+  return new module.Manifold(mesh);
+}
+
+function manifoldToGeometry(solid: ManifoldSolid) {
+  const mesh = solid.getMesh();
+  const positions = new Float32Array(mesh.numVert * 3);
+  for (let vertex = 0; vertex < mesh.numVert; vertex += 1) {
+    positions[vertex * 3] = mesh.vertProperties[vertex * mesh.numProp];
+    positions[vertex * 3 + 1] = mesh.vertProperties[vertex * mesh.numProp + 1];
+    positions[vertex * 3 + 2] = mesh.vertProperties[vertex * mesh.numProp + 2];
+  }
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+  geometry.setIndex(new THREE.BufferAttribute(new Uint32Array(mesh.triVerts), 1));
+  geometry.computeVertexNormals();
+  return geometry;
+}
 
 function orientGeometry(geometry: THREE.BufferGeometry, frame: FaceFrame) {
   geometry.applyMatrix4(faceTransform(frame));
@@ -122,11 +210,12 @@ function makeGraphicCutters(config: DiceConfig, frames: FaceFrame[]) {
 
 export async function buildDiceStl(config: DiceConfig): Promise<Blob> {
   await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+  const manifold = await loadManifold();
   const baseGeometry = createDieGeometry(
     config.sides,
     config.size,
     config.edge,
-    config.sphereCut,
+    false,
     config.sphereCutAmount,
   );
   const frames = getDieFaceFrames(config.sides, config.size);
@@ -135,27 +224,42 @@ export async function buildDiceStl(config: DiceConfig): Promise<Blob> {
   else if (config.markStyle === "graphic") cutterGeometries = makeGraphicCutters(config, frames);
   else cutterGeometries = makeTextCutters(config, frames);
 
-  const baseBrush = new Brush(baseGeometry);
-  baseBrush.updateMatrixWorld();
-  let result: THREE.Mesh = baseBrush;
+  const ownedSolids: ManifoldSolid[] = [];
+  let outputGeometry: THREE.BufferGeometry | undefined;
+  try {
+    let result = geometryToManifold(manifold, baseGeometry);
+    ownedSolids.push(result);
 
-  if (cutterGeometries.length) {
-    const merged = mergeGeometries(cutterGeometries, false);
-    if (merged) {
-      const cutterBrush = new Brush(merged);
-      cutterBrush.updateMatrixWorld();
-      const evaluator = new Evaluator();
-      evaluator.attributes = ["position", "normal"];
-      result = evaluator.evaluate(baseBrush, cutterBrush, SUBTRACTION);
-      merged.dispose();
+    if (config.sides === 6 && config.sphereCut) {
+      const sphere = manifold.Manifold.sphere(getD6SphereCutRadius(config.size, config.sphereCutAmount), 96);
+      const intersected = result.intersect(sphere);
+      ownedSolids.push(sphere, intersected);
+      result = intersected;
     }
-  }
 
-  const exporter = new STLExporter();
-  const bytes = exporter.parse(result, { binary: true }) as DataView;
-  cutterGeometries.forEach((geometry) => geometry.dispose());
-  baseGeometry.dispose();
-  return new Blob([bytes.buffer as ArrayBuffer], { type: "model/stl" });
+    if (cutterGeometries.length) {
+      const cutterSolids = cutterGeometries.map((geometry) => geometryToManifold(manifold, geometry));
+      ownedSolids.push(...cutterSolids);
+      const cutterUnion = manifold.Manifold.union(cutterSolids);
+      const debossed = result.subtract(cutterUnion);
+      ownedSolids.push(cutterUnion, debossed);
+      result = debossed;
+    }
+
+    if (result.status() !== "NoError" || result.isEmpty() || result.genus() < 0) {
+      throw new Error(`Printable mesh validation failed: ${result.status()}`);
+    }
+
+    outputGeometry = manifoldToGeometry(result);
+    const exporter = new STLExporter();
+    const bytes = exporter.parse(new THREE.Mesh(outputGeometry), { binary: true }) as DataView;
+    return new Blob([bytes.buffer as ArrayBuffer], { type: "model/stl" });
+  } finally {
+    outputGeometry?.dispose();
+    ownedSolids.forEach((solid) => solid.delete());
+    cutterGeometries.forEach((geometry) => geometry.dispose());
+    baseGeometry.dispose();
+  }
 }
 
 export function saveBlob(blob: Blob, filename: string) {

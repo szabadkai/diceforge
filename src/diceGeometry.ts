@@ -178,12 +178,16 @@ function roundedConvexGeometry(sharp: THREE.BufferGeometry, requestedRadius: num
   return geometry;
 }
 
-function sphereCutGeometry(geometry: THREE.BufferGeometry, size: number, amount: number) {
+export function getD6SphereCutRadius(size: number, amount: number) {
   const half = size / 2;
   const cornerRadius = Math.sqrt(3) * half;
   const edgeRadius = Math.sqrt(2) * half;
   const strength = THREE.MathUtils.clamp(amount, 0, 1.5);
-  const sphereRadius = THREE.MathUtils.lerp(cornerRadius - 0.02, edgeRadius + 0.03, strength);
+  return THREE.MathUtils.lerp(cornerRadius - 0.02, edgeRadius + 0.03, strength);
+}
+
+function sphereCutGeometry(geometry: THREE.BufferGeometry, size: number, amount: number) {
+  const sphereRadius = getD6SphereCutRadius(size, amount);
   const dieBrush = new Brush(geometry);
   const sphereGeometry = new THREE.SphereGeometry(sphereRadius, 96, 64);
   const sphereBrush = new Brush(sphereGeometry);

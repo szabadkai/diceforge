@@ -2,6 +2,8 @@
 
 DiceForge is a browser-based, print-ready polyhedral dice generator. It creates D6, D8, D10, D12, and D20 models with numbers, regular or randomized pips, custom text, or an uploaded SVG mark. Number and text marks support sixteen free, printable font choices, a shared label or per-face labels, adjustable face-pattern scaling, and true debossed geometry in the exported STL. Patterns are fitted against each die's real face polygon so maximum-scale marks remain printable. Every solid supports dense, smooth adjustable edge fillets, and the D6 also includes an independently adjustable high-resolution sphere-boolean corner cut. Directional preview lighting and recessed-mark shading make surface detail easier to judge before export.
 
+Printable booleans are resolved with the Manifold geometry engine. Export tests parse the generated binary STL and reject open edges, zero-area triangles, inverted volume, and other non-manifold topology across every supported die type.
+
 Current control ranges reach 4.8 mm for edge radius, 138% for the D6 sphere cut, and 180% for face-pattern scale (with geometry-aware limits on smaller solids).
 
 ## Run locally
