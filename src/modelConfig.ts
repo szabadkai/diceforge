@@ -16,5 +16,7 @@ export function printableConfigKey(config: DiceConfig) {
     config.pipSeed,
     config.values,
     config.graphicData,
+    config.graphicSetId,
+    config.graphicDataSet,
   ]);
 }

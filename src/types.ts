@@ -37,4 +37,7 @@ export interface DiceConfig {
   color: string;
   graphicName: string;
   graphicData: string;
+  graphicSetId?: string;
+  graphicDataSet?: string[];
+  graphicNames?: string[];
 }

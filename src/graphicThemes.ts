@@ -1,0 +1,76 @@
+export interface GraphicTheme {
+  id: string;
+  name: string;
+  caption: string;
+  accent: string;
+  paper: string;
+  marks: string[];
+}
+
+const rawMarks = import.meta.glob<string>("./assets/dice-themes/**/*.svg", {
+  eager: true,
+  query: "?raw",
+  import: "default",
+});
+
+function mark(path: string) {
+  const raw = rawMarks[`./assets/dice-themes/${path}.svg`];
+  if (!raw) throw new Error(`Missing built-in dice mark: ${path}`);
+  return `data:image/svg+xml;base64,${btoa(raw)}`;
+}
+
+function theme(
+  id: string,
+  name: string,
+  caption: string,
+  accent: string,
+  paper: string,
+  filenames: string[],
+): GraphicTheme {
+  return { id, name, caption, accent, paper, marks: filenames.map((filename) => mark(`${id}/${filename}`)) };
+}
+
+export const GRAPHIC_THEMES: GraphicTheme[] = [
+  theme("starfall", "Starfall", "Orbit · omen · eclipse", "#7ba9ff", "#e9efff", [
+    "sun", "moon", "star", "planet", "comet", "eye",
+  ]),
+  theme("witchs-pantry", "Witch's pantry", "Brews · familiars · charms", "#9e6bde", "#f0e9f8", [
+    "potion", "cat", "candle", "mushroom", "key", "crystal",
+  ]),
+  theme("dungeon-delve", "Dungeon delve", "Steel · treasure · danger", "#ff6433", "#fae9e2", [
+    "sword", "shield", "skull", "key", "chest", "torch",
+  ]),
+  theme("wildwood", "Wildwood", "Leaves · spores · small magic", "#5f9544", "#e9f2df", [
+    "leaf", "acorn", "flower", "pine", "mushroom", "moth",
+  ]),
+  theme("high-seas", "High seas", "Salt · storms · strange tides", "#3a97a8", "#e0f1f2", [
+    "anchor", "fish", "wave", "shell", "tentacle", "lighthouse",
+  ]),
+  theme("tiny-chaos", "Tiny chaos", "Cute things · bad decisions", "#e65386", "#fae8ef", [
+    "duck", "ghost", "frog", "crown", "lightning", "heart",
+  ]),
+  theme("neon-circuit", "Neon circuit", "Chrome · code · midnight", "#25a99a", "#e2f7f2", [
+    "chip", "robot", "antenna", "visor", "drone", "glitch-heart",
+  ]),
+  theme("fright-night", "Fright night", "Bats · shadows · old houses", "#7258a5", "#eee9f7", [
+    "bat", "coffin", "spider", "pumpkin", "haunted-house", "raven",
+  ]),
+  theme("snack-attack", "Snack attack", "Treats · caffeine · crumbs", "#ed8a31", "#fff0df", [
+    "pizza", "cupcake", "taco", "coffee", "popsicle", "ramen",
+  ]),
+  theme("critter-crew", "Critter crew", "Paws · wings · tiny friends", "#b97547", "#f5eadf", [
+    "fox", "bunny", "bear", "paw", "owl", "bee",
+  ]),
+  theme("dino-days", "Dino days", "Fossils · ferns · big stomps", "#779a39", "#edf3df", [
+    "trex", "footprint", "egg", "bone", "volcano", "fern",
+  ]),
+  theme("primal-elements", "Primal elements", "Flame · tide · stone · storm", "#db4e39", "#f9e7df", [
+    "flame", "drop", "mountain", "wind", "snowflake", "earth",
+  ]),
+];
+
+export const DEFAULT_GRAPHIC_THEME = GRAPHIC_THEMES[0];
+
+export function getGraphicTheme(id?: string) {
+  return GRAPHIC_THEMES.find((item) => item.id === id);
+}

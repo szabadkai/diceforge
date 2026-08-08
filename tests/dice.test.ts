@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readdirSync, readFileSync } from "node:fs";
 import test from "node:test";
 import { DOMParser } from "@xmldom/xmldom";
 import {
@@ -8,10 +9,12 @@ import {
   patternFillScale,
 } from "../src/diceGeometry";
 import { FONT_OPTIONS } from "../src/fontCatalog";
+import { fillFaceSet, swapFaceAssignments } from "../src/graphicSet";
 import { pipLayout } from "../src/markTexture";
 import { printableConfigKey } from "../src/modelConfig";
 import { createSphericalPipCutter, sphericalPipDimensions } from "../src/pipGeometry";
 import { getFont } from "../src/stlFonts";
+import { splitFaceWords, TEXT_PRESETS, textPresetValues, textWordValues } from "../src/textPresets";
 import { buildDiceStl, parseDiceStl } from "../src/stlExport";
 import type { DiceConfig, DieSides } from "../src/types";
 
@@ -20,6 +23,19 @@ globalThis.requestAnimationFrame = ((callback: FrameRequestCallback) => {
   return 0;
 }) as typeof requestAnimationFrame;
 globalThis.DOMParser = DOMParser as unknown as typeof globalThis.DOMParser;
+
+test("custom SVG sets cycle in file order to fill every face", () => {
+  assert.deepEqual(fillFaceSet(["leaf", "moon", "duck"], 8), [
+    "leaf", "moon", "duck", "leaf", "moon", "duck", "leaf", "moon",
+  ]);
+  assert.deepEqual(fillFaceSet([], 6), []);
+});
+
+test("custom SVG face assignments swap after expanding the active die", () => {
+  assert.deepEqual(swapFaceAssignments(["leaf", "moon", "duck"], 0, 4, 6), [
+    "moon", "moon", "duck", "leaf", "leaf", "duck",
+  ]);
+});
 
 async function auditBinaryStl(stl: Blob) {
   const view = new DataView(await stl.arrayBuffer());
@@ -157,14 +173,14 @@ test("random pip layouts are seeded, irregular, and keep the requested count", (
 });
 
 test("pip diameter and depth produce printable spherical caps", () => {
-  const hemisphere = sphericalPipDimensions(12, 0.8, 6, 1.3, 0.65);
+  const hemisphere = sphericalPipDimensions(1.3, 0.65);
   assert.deepEqual(hemisphere, {
     openingRadius: 0.65,
     depth: 0.65,
     sphereRadius: 0.65,
     centerOffset: 0,
   });
-  const wideCap = sphericalPipDimensions(12, 0.8, 6, 2, 0.4);
+  const wideCap = sphericalPipDimensions(2, 0.4);
   assert.equal(wideCap.openingRadius, 1);
   assert.equal(wideCap.depth, 0.4);
   assert.ok(Math.abs(wideCap.sphereRadius - 1.45) < 0.000001);
@@ -182,11 +198,36 @@ test("pip diameter and depth produce printable spherical caps", () => {
   cutter.dispose();
 });
 
+test("pip diameter follows the requested physical size across the full control range", () => {
+  for (const diameter of [0.6, 1.3, 3, 4.5, 6]) {
+    const dimensions = sphericalPipDimensions(diameter, 0.3);
+    assert.equal(dimensions.openingRadius * 2, diameter);
+  }
+});
+
 test("every font picker option creates printable outlines", () => {
   assert.equal(FONT_OPTIONS.length, 16);
   FONT_OPTIONS.forEach(({ id }) => {
     assert.ok(getFont(id).generateShapes("88", 10).length > 0, `${id} should contain printable number outlines`);
   });
+});
+
+test("curated text sets scale to every supported die", () => {
+  assert.ok(TEXT_PRESETS.length >= 20);
+  TEXT_PRESETS.forEach((preset) => {
+    assert.equal(preset.values.length, 20, `${preset.id} must fill a D20`);
+    assert.equal(new Set(preset.values).size, 20, `${preset.id} values must be unique`);
+    assert.ok(preset.values.every((value) => value.length <= 12), `${preset.id} labels must fit the text limit`);
+    for (const sides of [6, 8, 10, 12, 20] as DieSides[]) {
+      assert.deepEqual(textPresetValues(preset.id, sides), preset.values.slice(0, sides));
+    }
+  });
+});
+
+test("custom word lists map one whitespace-separated word to each face", () => {
+  assert.deepEqual(splitFaceWords("  YES  no\nMAYBE\tEXTRAORDINARILY  "), ["YES", "no", "MAYBE", "EXTRAORDINAR"]);
+  assert.deepEqual(textWordValues("one two three", 6), ["one", "two", "three", "", "", ""]);
+  assert.deepEqual(textWordValues("one two three four five six seven", 6), ["one", "two", "three", "four", "five", "six"]);
 });
 
 test("preview cache tracks printable settings but ignores preview color", () => {
@@ -212,6 +253,7 @@ test("preview cache tracks printable settings but ignores preview color", () => 
   assert.equal(printableConfigKey(config), printableConfigKey({ ...config, color: "#ff6433" }));
   assert.notEqual(printableConfigKey(config), printableConfigKey({ ...config, patternScale: 1.05 }));
   assert.notEqual(printableConfigKey(config), printableConfigKey({ ...config, pipSize: 1.5 }));
+  assert.notEqual(printableConfigKey(config), printableConfigKey({ ...config, graphicDataSet: ["theme-mark"] }));
 });
 
 test("D6 sphere boolean cuts the rounded cube corners", () => {
@@ -233,7 +275,7 @@ test("exports a binary STL with debossed pips at maximum control ranges", async 
     sphereCut: true,
     sphereCutAmount: 1.38,
     depth: 0.55,
-    pipSize: 3,
+    pipSize: 6,
     patternScale: 1.8,
     markStyle: "pips",
     font: "helvetiker-bold",
@@ -275,6 +317,71 @@ test("turns uploaded SVG paths into debossed geometry", async () => {
   const stl = await buildDiceStl(config);
   assert.ok(stl.size > 10_000);
   await assertWatertight(stl);
+});
+
+test("every built-in SVG mark produces printable D20 geometry", async (context) => {
+  const root = new URL("../src/assets/dice-themes/", import.meta.url);
+  for (const theme of readdirSync(root)) {
+    const themeUrl = new URL(`${theme}/`, root);
+    for (const filename of readdirSync(themeUrl).filter((item) => item.endsWith(".svg"))) {
+      await context.test(`${theme}/${filename}`, async () => {
+        const svg = readFileSync(new URL(filename, themeUrl), "utf8");
+        const config: DiceConfig = {
+          sides: 20,
+          size: 24,
+          edge: 1.2,
+          sphereCut: false,
+          sphereCutAmount: 0.55,
+          depth: 0.65,
+          pipSize: 1.3,
+          patternScale: 0.9,
+          markStyle: "graphic",
+          font: "helvetiker-bold",
+          faceText: "LUCKY",
+          randomPips: false,
+          pipSeed: 42,
+          values: Array.from({ length: 20 }, (_, index) => String(index + 1)),
+          color: "#ffffff",
+          graphicName: filename,
+          graphicData: `data:image/svg+xml;base64,${btoa(svg)}`,
+        };
+        await assertWatertight(await buildDiceStl(config), `${theme}/${filename}`);
+      });
+    }
+  }
+});
+
+test("every built-in SVG collection produces a printable D20", async (context) => {
+  const root = new URL("../src/assets/dice-themes/", import.meta.url);
+  for (const theme of readdirSync(root)) {
+    await context.test(theme, async () => {
+      const themeUrl = new URL(`${theme}/`, root);
+      const graphicDataSet = readdirSync(themeUrl)
+        .filter((item) => item.endsWith(".svg"))
+        .map((filename) => `data:image/svg+xml;base64,${btoa(readFileSync(new URL(filename, themeUrl), "utf8"))}`);
+      const config: DiceConfig = {
+        sides: 20,
+        size: 24,
+        edge: 1.2,
+        sphereCut: false,
+        sphereCutAmount: 0.55,
+        depth: 0.65,
+        pipSize: 1.3,
+        patternScale: 0.9,
+        markStyle: "graphic",
+        font: "helvetiker-bold",
+        faceText: "LUCKY",
+        randomPips: false,
+        pipSeed: 42,
+        values: Array.from({ length: 20 }, (_, index) => String(index + 1)),
+        color: "#ffffff",
+        graphicName: theme,
+        graphicData: "",
+        graphicDataSet,
+      };
+      await assertWatertight(await buildDiceStl(config), theme);
+    });
+  }
 });
 
 test("exports custom face text with a selected printable font", async () => {

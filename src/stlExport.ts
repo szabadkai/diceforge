@@ -4,7 +4,6 @@ import { STLExporter } from "three/examples/jsm/exporters/STLExporter.js";
 import { STLLoader } from "three/examples/jsm/loaders/STLLoader.js";
 import { TextGeometry } from "three/examples/jsm/geometries/TextGeometry.js";
 import { SVGLoader } from "three/examples/jsm/loaders/SVGLoader.js";
-import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import {
   createDieGeometry,
   faceTransform,
@@ -118,9 +117,6 @@ function makePipCutters(config: DiceConfig, frames: FaceFrame[]) {
     const layout = pipLayout(config.values[faceIndex], config.randomPips, config.pipSeed, faceIndex);
     if (!layout.length) return;
     const dimensions = sphericalPipDimensions(
-      frame.inradius,
-      fill,
-      layout.length,
       config.pipSize,
       config.depth,
     );
@@ -174,42 +170,55 @@ function makeTextCutters(config: DiceConfig, frames: FaceFrame[]) {
 }
 
 function makeGraphicCutters(config: DiceConfig, frames: FaceFrame[]) {
-  if (!config.graphicData) return [];
-  try {
-    const encoded = config.graphicData.split(",")[1] || "";
+  const graphics = config.graphicDataSet?.length ? config.graphicDataSet : config.graphicData ? [config.graphicData] : [];
+  if (!graphics.length) return [];
+  const sources = new Map<string, { geometries: THREE.BufferGeometry[]; bounds: THREE.Box3; dimensions: THREE.Vector3 }>();
+  const sourceFor = (graphicData: string) => {
+    const cached = sources.get(graphicData);
+    if (cached) return cached;
+    const encoded = graphicData.split(",")[1] || "";
     const svgText = decodeURIComponent(escape(atob(encoded)));
     const data = new SVGLoader().parse(svgText);
     const shapes = data.paths.flatMap((path) => SVGLoader.createShapes(path));
-    if (!shapes.length) return [];
-    const source = mergeGeometries(
-      shapes.map((shape) => new THREE.ExtrudeGeometry(shape, {
-        depth: config.depth * 2.2,
-        bevelEnabled: false,
-        curveSegments: 5,
-      })),
-      false,
-    );
-    if (!source) return [];
-    source.computeBoundingBox();
-    const bounds = source.boundingBox!;
-    const dimensions = new THREE.Vector3();
-    bounds.getSize(dimensions);
-    if (!dimensions.x || !dimensions.y) return [];
-    const fill = patternFillScale(config.patternScale);
+    if (!shapes.length) return undefined;
+    const geometries = shapes.map((shape) => new THREE.ExtrudeGeometry(shape, {
+      depth: config.depth * 2.2,
+      bevelEnabled: false,
+      curveSegments: 5,
+    }));
+    const bounds = new THREE.Box3();
+    geometries.forEach((geometry) => {
+      geometry.computeBoundingBox();
+      if (geometry.boundingBox) bounds.union(geometry.boundingBox);
+    });
+    const source = { geometries, bounds, dimensions: bounds.getSize(new THREE.Vector3()) };
+    sources.set(graphicData, source);
+    return source;
+  };
 
-    return frames.slice(0, config.sides).map((frame) => {
-      const geometry = source.clone();
+  try {
+    const fill = patternFillScale(config.patternScale);
+    return frames.slice(0, config.sides).flatMap((frame, faceIndex) => {
+      const source = sourceFor(graphics[faceIndex % graphics.length]);
+      if (!source) return [];
+      const { bounds, dimensions } = source;
+      if (!dimensions.x || !dimensions.y) return [];
       const scale = fitCenteredRectangle(frame, dimensions.x, dimensions.y) * fill;
-      geometry.translate(
-        -(bounds.min.x + bounds.max.x) / 2,
-        -(bounds.min.y + bounds.max.y) / 2,
-        -config.depth * 0.8,
-      );
-      geometry.scale(scale, -scale, 1);
-      return orientGeometry(geometry, frame);
+      return source.geometries.map((sourceGeometry) => {
+        const geometry = sourceGeometry.clone();
+        geometry.translate(
+          -(bounds.min.x + bounds.max.x) / 2,
+          -(bounds.min.y + bounds.max.y) / 2,
+          -config.depth * 0.8,
+        );
+        geometry.scale(scale, -scale, 1);
+        return orientGeometry(geometry, frame);
+      });
     });
   } catch {
     return [];
+  } finally {
+    sources.forEach((source) => source.geometries.forEach((geometry) => geometry.dispose()));
   }
 }
 
@@ -251,6 +260,8 @@ export async function buildDiceStl(config: DiceConfig): Promise<Blob> {
       result = debossed;
     }
 
+    // Complex SVG booleans can leave sub-micron sliver triangles on angled
+    // faces. Collapse them within a tolerance far below printer resolution.
     if (result.status() !== "NoError" || result.isEmpty() || result.genus() < 0) {
       throw new Error(`Printable mesh validation failed: ${result.status()}`);
     }
