@@ -7,22 +7,9 @@ export const BLADE_SUPPORT_THICKNESS = 0.35;
 export const BLADE_SUPPORT_FOOT_WIDTH = 2.2;
 export const BLADE_SUPPORT_FOOT_HEIGHT = 0.8;
 export const BLADE_SUPPORT_CONTACT_TAPER = 0.4;
-export const BLADE_SUPPORT_CONTACT_ROOT = 0.18;
-export const BLADE_SUPPORT_CONTACT_LENGTH = 0.7;
-export const BLADE_SUPPORT_CONTACT_PITCH = 1.5;
 
 export function bladeSupportContactWidth(supportWidth: number) {
   return THREE.MathUtils.clamp(supportWidth * 0.4, 0.14, 0.24);
-}
-
-export function bladeSupportContactIntervals(length: number) {
-  const count = Math.max(1, Math.ceil(length / BLADE_SUPPORT_CONTACT_PITCH));
-  const pitch = length / count;
-  const contactLength = Math.min(BLADE_SUPPORT_CONTACT_LENGTH, pitch * 0.55);
-  return Array.from({ length: count }, (_, index) => {
-    const center = -length * 0.5 + (index + 0.5) * pitch;
-    return { start: center - contactLength * 0.5, end: center + contactLength * 0.5 };
-  });
 }
 
 type Edge = {
@@ -128,13 +115,13 @@ function bladeGeometry(
   const contactWidth = bladeSupportContactWidth(supportWidth);
   const bottom = platformTop - 0.04;
   const positions: number[] = [];
-  const rowCount = 3;
+  const rowCount = 4;
   const stationCount = topHeights.length;
 
   const station = topHeights.map((height, index) => ({
     x: THREE.MathUtils.lerp(-length * 0.5, length * 0.5, index / (stationCount - 1)),
-    heights: [bottom, height - BLADE_SUPPORT_CONTACT_TAPER, height - BLADE_SUPPORT_CONTACT_ROOT],
-    widths: [supportWidth, supportWidth, contactWidth],
+    heights: [bottom, height - BLADE_SUPPORT_CONTACT_TAPER, height, height + 0.12],
+    widths: [supportWidth, supportWidth, contactWidth, contactWidth],
   }));
   const point = (stationIndex: number, row: number, front: boolean) => {
     const sample = station[stationIndex];
@@ -148,7 +135,8 @@ function bladeGeometry(
 
   for (let index = 0; index < stationCount - 1; index += 1) {
     for (let row = 0; row < rowCount - 1; row += 1) {
-      // The broad lower fin remains continuous and stops short of the die.
+      // The broad lower fin tapers into a much thinner continuous interface
+      // before entering the die, preserving full edge support with less scar.
       quad(point(index, row, true), point(index + 1, row, true), point(index + 1, row + 1, true), point(index, row + 1, true));
       quad(point(index, row, false), point(index, row + 1, false), point(index + 1, row + 1, false), point(index + 1, row, false));
     }
@@ -171,41 +159,7 @@ function bladeGeometry(
     normal,
   ));
   geometry.translate(center.x, 0, center.z);
-
-  const heightAt = (x: number) => {
-    const scaledIndex = THREE.MathUtils.clamp((x / length + 0.5) * (stationCount - 1), 0, stationCount - 1);
-    const lowerIndex = Math.min(Math.floor(scaledIndex), stationCount - 2);
-    return THREE.MathUtils.lerp(
-      topHeights[lowerIndex],
-      topHeights[lowerIndex + 1],
-      scaledIndex - lowerIndex,
-    );
-  };
-  const contacts = bladeSupportContactIntervals(length).map((interval) => {
-    const startHeight = heightAt(interval.start);
-    const endHeight = heightAt(interval.end);
-    const shape = new THREE.Shape();
-    shape.moveTo(interval.start, startHeight - BLADE_SUPPORT_CONTACT_ROOT - 0.04);
-    shape.lineTo(interval.end, endHeight - BLADE_SUPPORT_CONTACT_ROOT - 0.04);
-    shape.lineTo(interval.end, endHeight + 0.12);
-    shape.lineTo(interval.start, startHeight + 0.12);
-    shape.closePath();
-    const contact = new THREE.ExtrudeGeometry(shape, {
-      depth: contactWidth,
-      bevelEnabled: false,
-      curveSegments: 1,
-    });
-    contact.translate(0, 0, -contactWidth * 0.5);
-    contact.applyMatrix4(new THREE.Matrix4().makeBasis(
-      direction,
-      new THREE.Vector3(0, 1, 0),
-      normal,
-    ));
-    contact.translate(center.x, 0, center.z);
-    return contact;
-  });
-
-  return [geometry, ...contacts];
+  return geometry;
 }
 
 function footGeometry(
@@ -311,10 +265,10 @@ export function createBladeSupportLayout(
       if (heights.length === 7) break;
     }
     if (heights.length !== 7 || Math.min(...heights) <= platformTop + 0.2) return;
-    const bladeParts = bladeGeometry(start, end, heights, platformTop, supportWidth);
+    const blade = bladeGeometry(start, end, heights, platformTop, supportWidth);
     const foot = footGeometry(start, end, platformTop, footIndex * 0.001, supportWidth);
     footIndex += 1;
-    if (bladeParts) supportGeometries.push(...bladeParts);
+    if (blade) supportGeometries.push(blade);
     if (foot) supportGeometries.push(foot);
   });
 

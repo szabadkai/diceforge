@@ -779,7 +779,7 @@ export default function App() {
               <section id="support-die">
                 <span className="chapter-number">03 / SUPPORTS</span>
                 <h3>Support edges, not artwork.</h3>
-                <p>Generated blade supports place continuous fins beneath the spoke edges that begin at the first printed tip, then join them to low rail feet. Near the die, each fin stops short and continues as spaced 0.14–0.24 mm breakaway tabs for cleaner removal. Later perimeter edges are omitted because the solid layers below already carry them. Set the structural width near 0.35 mm for resin or 0.8 mm and above for a multi-line FDM wall.</p>
+                <p>Generated blade supports place continuous fins beneath the spoke edges that begin at the first printed tip, then join them to low rail feet. Each fin tapers into a continuous 0.14–0.24 mm breakaway contact line at the die for cleaner removal. Later perimeter edges are omitted because the solid layers below already carry them. Set the structural width near 0.35 mm for resin or 0.8 mm and above for a multi-line FDM wall.</p>
                 <div className="do-dont-grid">
                   <div><span>DO</span><b>Inspect every generated fin</b><p>Scrub the slicer layers and confirm the rails sit flat, the first tip is anchored, and no new island appears unsupported.</p></div>
                   <div><span>AVOID</span><b>Tips inside marks or on face centers</b><p>Supports in numbers, pips, and broad cosmetic areas are difficult to remove without visible craters.</p></div>
