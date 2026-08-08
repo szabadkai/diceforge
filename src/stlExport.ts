@@ -4,7 +4,13 @@ import { STLExporter } from "three/examples/jsm/exporters/STLExporter.js";
 import { TextGeometry } from "three/examples/jsm/geometries/TextGeometry.js";
 import { SVGLoader } from "three/examples/jsm/loaders/SVGLoader.js";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
-import { createDieGeometry, faceTransform, getDieFaceFrames } from "./diceGeometry";
+import {
+  createDieGeometry,
+  faceTransform,
+  fitCenteredRectangle,
+  getDieFaceFrames,
+  patternFillScale,
+} from "./diceGeometry";
 import type { FaceFrame } from "./diceGeometry";
 import { getFont } from "./stlFonts";
 import { pipLayout } from "./markTexture";
@@ -17,21 +23,22 @@ function orientGeometry(geometry: THREE.BufferGeometry, frame: FaceFrame) {
 
 function makePipCutters(config: DiceConfig, frames: FaceFrame[]) {
   const cutters: THREE.BufferGeometry[] = [];
+  const fill = patternFillScale(config.patternScale);
   frames.slice(0, config.sides).forEach((frame, faceIndex) => {
     const layout = pipLayout(config.values[faceIndex], config.randomPips, config.pipSeed, faceIndex);
     if (!layout.length) return;
     const radius = Math.min(
-      frame.radius * 0.15 * config.patternScale / Math.max(1, Math.sqrt(layout.length / 6)),
+      frame.inradius * 0.13 * fill / Math.max(1, Math.sqrt(layout.length / 6)),
       0.92,
     );
     layout.forEach(([x, y]) => {
-      const cylinder = new THREE.CylinderGeometry(radius, radius * 0.9, config.depth * 2.2, 20, 1, false);
+      const cylinder = new THREE.CylinderGeometry(radius, radius * 0.9, config.depth * 2.2, 48, 1, false);
       const quaternion = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), frame.normal);
       cylinder.applyQuaternion(quaternion);
       const position = frame.center
         .clone()
-        .addScaledVector(frame.tangent, x * frame.radius * 2 * config.patternScale)
-        .addScaledVector(frame.bitangent, y * frame.radius * 2 * config.patternScale)
+        .addScaledVector(frame.tangent, x * frame.inradius * 1.8 * fill)
+        .addScaledVector(frame.bitangent, y * frame.inradius * 1.8 * fill)
         .addScaledVector(frame.normal, -config.depth * 0.2);
       cylinder.translate(position.x, position.y, position.z);
       cutters.push(cylinder);
@@ -42,6 +49,7 @@ function makePipCutters(config: DiceConfig, frames: FaceFrame[]) {
 
 function makeTextCutters(config: DiceConfig, frames: FaceFrame[]) {
   const cutters: THREE.BufferGeometry[] = [];
+  const fill = patternFillScale(config.patternScale);
   frames.slice(0, config.sides).forEach((frame, faceIndex) => {
     const value = config.values[faceIndex]?.trim();
     if (!value) return;
@@ -50,16 +58,14 @@ function makeTextCutters(config: DiceConfig, frames: FaceFrame[]) {
       font: getFont(config.font),
       size: frame.radius,
       depth: config.depth * 2.2,
-      curveSegments: 3,
+      curveSegments: 5,
       bevelEnabled: false,
     });
     geometry.computeBoundingBox();
     let box = geometry.boundingBox!;
     const width = Math.max(0.001, box.max.x - box.min.x);
     const height = Math.max(0.001, box.max.y - box.min.y);
-    const targetWidth = frame.radius * (config.markStyle === "text" ? 1.7 : 1.35) * config.patternScale;
-    const targetHeight = frame.radius * 1.35 * config.patternScale;
-    const scale = Math.min(targetWidth / width, targetHeight / height);
+    const scale = fitCenteredRectangle(frame, width, height) * fill;
     geometry.scale(scale, scale, 1);
     geometry.computeBoundingBox();
     box = geometry.boundingBox!;
@@ -86,7 +92,7 @@ function makeGraphicCutters(config: DiceConfig, frames: FaceFrame[]) {
       shapes.map((shape) => new THREE.ExtrudeGeometry(shape, {
         depth: config.depth * 2.2,
         bevelEnabled: false,
-        curveSegments: 3,
+        curveSegments: 5,
       })),
       false,
     );
@@ -95,12 +101,12 @@ function makeGraphicCutters(config: DiceConfig, frames: FaceFrame[]) {
     const bounds = source.boundingBox!;
     const dimensions = new THREE.Vector3();
     bounds.getSize(dimensions);
-    const maxDimension = Math.max(dimensions.x, dimensions.y);
-    if (!maxDimension) return [];
+    if (!dimensions.x || !dimensions.y) return [];
+    const fill = patternFillScale(config.patternScale);
 
     return frames.slice(0, config.sides).map((frame) => {
       const geometry = source.clone();
-      const scale = (frame.radius * 1.25 * config.patternScale) / maxDimension;
+      const scale = fitCenteredRectangle(frame, dimensions.x, dimensions.y) * fill;
       geometry.translate(
         -(bounds.min.x + bounds.max.x) / 2,
         -(bounds.min.y + bounds.max.y) / 2,

@@ -1,7 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { DOMParser } from "@xmldom/xmldom";
-import { createDieGeometry, getDieFaceFrames } from "../src/diceGeometry";
+import {
+  createDieGeometry,
+  fitCenteredRectangle,
+  getDieFaceFrames,
+  patternFillScale,
+} from "../src/diceGeometry";
 import { pipLayout } from "../src/markTexture";
 import { buildDiceStl } from "../src/stlExport";
 import type { DiceConfig, DieSides } from "../src/types";
@@ -16,7 +21,7 @@ for (const sides of [6, 8, 10, 12, 20] as DieSides[]) {
   test(`D${sides} has ${sides} usable faces`, () => {
     const frames = getDieFaceFrames(sides, 24);
     assert.equal(frames.length, sides);
-    assert.ok(frames.every((frame) => frame.radius > 1));
+    assert.ok(frames.every((frame) => frame.radius > 1 && frame.inradius > 1 && frame.polygon.length >= 3));
   });
 
   test(`D${sides} edge radius changes its printable body`, () => {
@@ -38,6 +43,30 @@ for (const sides of [6, 8, 10, 12, 20] as DieSides[]) {
     round.dispose();
   });
 }
+
+test("fillets use a dense printable mesh", () => {
+  const geometry = createDieGeometry(6, 24, 1.2);
+  assert.ok(geometry.getAttribute("position").count > 1_000);
+  geometry.dispose();
+});
+
+test("maximum-size marks fit inside every unique face polygon", () => {
+  for (const sides of [6, 8, 10, 12, 20] as DieSides[]) {
+    getDieFaceFrames(sides, 24).forEach((frame) => {
+      const width = 2;
+      const height = 1;
+      const scale = fitCenteredRectangle(frame, width, height) * patternFillScale(1.8);
+      frame.polygon.forEach((point, index) => {
+        const next = frame.polygon[(index + 1) % frame.polygon.length];
+        const edge = next.clone().sub(point);
+        const normal = edge.clone().set(-edge.y, edge.x).normalize();
+        const edgeDistance = Math.abs(normal.dot(point));
+        const markSupport = (Math.abs(normal.x) * width + Math.abs(normal.y) * height) * scale * 0.5;
+        assert.ok(markSupport <= edgeDistance + 0.0001);
+      });
+    });
+  }
+});
 
 test("random pip layouts are seeded, irregular, and keep the requested count", () => {
   const regular = pipLayout("6");

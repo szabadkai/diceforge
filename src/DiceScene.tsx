@@ -39,7 +39,16 @@ function FaceMark({
   return (
     <mesh matrixAutoUpdate={false} matrix={matrix} renderOrder={2}>
       <planeGeometry args={[radius * 2, radius * 2]} />
-      <meshBasicMaterial map={texture} transparent depthWrite={false} polygonOffset polygonOffsetFactor={-2} />
+      <meshStandardMaterial
+        map={texture}
+        bumpMap={texture}
+        bumpScale={-0.22}
+        roughness={0.9}
+        transparent
+        depthWrite={false}
+        polygonOffset
+        polygonOffsetFactor={-2}
+      />
     </mesh>
   );
 }
@@ -81,7 +90,7 @@ function Die({ config }: { config: DiceConfig }) {
         />
       </mesh>
       {frames.slice(0, config.sides).map((frame, index) => {
-        const offset = frame.center.clone().addScaledVector(frame.normal, 0.035);
+        const offset = frame.center.clone().addScaledVector(frame.normal, 0.025);
         const positioned = { ...frame, center: offset };
         return (
           <FaceMark
@@ -95,7 +104,7 @@ function Die({ config }: { config: DiceConfig }) {
             faceIndex={index}
             font={config.font}
             matrix={faceTransform(positioned)}
-            radius={frame.radius}
+            radius={frame.inradius}
           />
         );
       })}
@@ -108,15 +117,17 @@ export default function DiceScene({ config }: { config: DiceConfig }) {
     <Canvas shadows dpr={[1, 2]} camera={{ position: [25, 18, 28], fov: 34 }}>
       <color attach="background" args={["#242722"]} />
       <fog attach="fog" args={["#242722", 35, 62]} />
-      <ambientLight intensity={1.2} />
+      <ambientLight intensity={0.34} />
+      <hemisphereLight args={["#fff5df", "#1b211d", 0.72]} />
       <directionalLight
         castShadow
-        position={[12, 18, 10]}
-        intensity={3.5}
-        shadow-mapSize-width={1024}
-        shadow-mapSize-height={1024}
+        position={[10, 16, 14]}
+        intensity={4.8}
+        shadow-mapSize-width={2048}
+        shadow-mapSize-height={2048}
       />
-      <directionalLight position={[-12, 4, -8]} color="#ff6b2c" intensity={1.3} />
+      <directionalLight position={[-14, 5, 6]} color="#ff7a3e" intensity={1.8} />
+      <directionalLight position={[4, 7, -16]} color="#8db7ff" intensity={1.15} />
       <Suspense fallback={null}>
         <Die config={config} />
       </Suspense>

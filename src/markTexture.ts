@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { patternFillScale } from "./diceGeometry";
 import { getCanvasFont } from "./fontCatalog";
 import type { FontId, MarkStyle } from "./types";
 
@@ -78,46 +79,78 @@ export function createMarkTexture(
   canvas.height = 384;
   const context = canvas.getContext("2d")!;
   const ink = "#171915";
+  const fill = patternFillScale(patternScale);
+
+  const drawRecessedText = (text: string, x: number, y: number) => {
+    context.fillStyle = "rgba(255,255,255,.48)";
+    context.fillText(text, x - 2.2, y - 2.2);
+    context.fillStyle = "rgba(0,0,0,.72)";
+    context.fillText(text, x + 3, y + 3.5);
+    context.fillStyle = ink;
+    context.fillText(text, x, y);
+  };
+
+  const drawRecessedDot = (x: number, y: number, radius: number) => {
+    [[-2, -2, "rgba(255,255,255,.5)"], [3, 3.5, "rgba(0,0,0,.72)"], [0, 0, ink]].forEach(
+      ([offsetX, offsetY, color]) => {
+        context.beginPath();
+        context.arc(x + Number(offsetX), y + Number(offsetY), radius, 0, Math.PI * 2);
+        context.fillStyle = String(color);
+        context.fill();
+      },
+    );
+  };
 
   const drawText = () => {
     context.clearRect(0, 0, 384, 384);
-    context.fillStyle = ink;
-    context.shadowColor = "rgba(255,255,255,.42)";
-    context.shadowBlur = 3;
-    context.shadowOffsetY = 4;
-    const length = Math.max(1, value.length);
-    const baseSize = style === "text"
-      ? Math.min(220, 300 / Math.max(1, length * 0.58))
-      : length > 2 ? 150 : length === 2 ? 190 : 230;
-    context.font = `800 ${baseSize * patternScale}px ${getCanvasFont(font)}`;
     context.textAlign = "center";
     context.textBaseline = "middle";
-    context.fillText(value, 192, 200);
+    let fontSize = 280;
+    context.font = `800 ${fontSize}px ${getCanvasFont(font)}`;
+    const measured = context.measureText(value || " ");
+    const measuredHeight = Math.max(1, measured.actualBoundingBoxAscent + measured.actualBoundingBoxDescent);
+    const maxWidth = 320 * fill;
+    const maxHeight = 270 * fill;
+    fontSize *= Math.min(maxWidth / Math.max(1, measured.width), maxHeight / measuredHeight, 1);
+    context.font = `800 ${fontSize}px ${getCanvasFont(font)}`;
+    drawRecessedText(value, 192, 198);
   };
 
   const layout = pipLayout(value, randomPips, pipSeed, faceIndex);
   if (style === "pips" && layout.length) {
     context.clearRect(0, 0, 384, 384);
-    context.fillStyle = ink;
-    const dotRadius = Math.max(10, Math.min(31, 31 * patternScale / Math.max(1, Math.sqrt(layout.length / 6))));
+    const dotRadius = Math.max(8, Math.min(25, 25 * fill / Math.max(1, Math.sqrt(layout.length / 6))));
     layout.forEach(([x, y]) => {
-      context.beginPath();
-      context.arc(192 + x * 270 * patternScale, 192 + y * 270 * patternScale, dotRadius, 0, Math.PI * 2);
-      context.fill();
+      drawRecessedDot(192 + x * 346 * fill, 192 + y * 346 * fill, dotRadius);
     });
   } else if (style === "graphic" && graphicData) {
     const image = new Image();
     image.onload = () => {
       context.clearRect(0, 0, 384, 384);
-      const imageSize = 276 * patternScale;
-      const origin = (384 - imageSize) / 2;
-      context.save();
-      context.filter = "grayscale(1) contrast(8)";
-      context.drawImage(image, origin, origin, imageSize, imageSize);
-      context.globalCompositeOperation = "source-in";
-      context.fillStyle = ink;
-      context.fillRect(0, 0, 384, 384);
-      context.restore();
+      const target = 320 * fill;
+      const imageScale = Math.min(target / Math.max(1, image.naturalWidth), target / Math.max(1, image.naturalHeight));
+      const width = image.naturalWidth * imageScale;
+      const height = image.naturalHeight * imageScale;
+      const mask = document.createElement("canvas");
+      mask.width = 384;
+      mask.height = 384;
+      const maskContext = mask.getContext("2d")!;
+      maskContext.filter = "grayscale(1) contrast(8)";
+      maskContext.drawImage(image, (384 - width) / 2, (384 - height) / 2, width, height);
+      const drawTint = (offsetX: number, offsetY: number, color: string) => {
+        const layer = document.createElement("canvas");
+        layer.width = 384;
+        layer.height = 384;
+        const layerContext = layer.getContext("2d")!;
+        layerContext.drawImage(mask, offsetX, offsetY);
+        layerContext.globalCompositeOperation = "source-in";
+        layerContext.fillStyle = color;
+        layerContext.fillRect(0, 0, 384, 384);
+        context.drawImage(layer, 0, 0);
+      };
+      drawTint(-2.2, -2.2, "rgba(255,255,255,.48)");
+      drawTint(3, 3.5, "rgba(0,0,0,.72)");
+      drawTint(0, 0, ink);
       texture.needsUpdate = true;
     };
     image.src = graphicData;
@@ -127,6 +160,6 @@ export function createMarkTexture(
 
   const texture = new THREE.CanvasTexture(canvas);
   texture.colorSpace = THREE.SRGBColorSpace;
-  texture.anisotropy = 4;
+  texture.anisotropy = 8;
   return texture;
 }

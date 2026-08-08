@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { Brush, Evaluator, INTERSECTION } from "three-bvh-csg";
 import { ConvexGeometry } from "three/examples/jsm/geometries/ConvexGeometry.js";
+import { mergeVertices } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import type { DieSides } from "./types";
 
 export interface FaceFrame {
@@ -9,7 +10,11 @@ export interface FaceFrame {
   tangent: THREE.Vector3;
   bitangent: THREE.Vector3;
   radius: number;
+  inradius: number;
+  polygon: THREE.Vector2[];
 }
+
+const FILLET_SUBDIVISIONS = 6;
 
 function pentagonalTrapezohedron(): THREE.BufferGeometry {
   const positions: number[] = [];
@@ -105,6 +110,28 @@ function insetVertex(
   return right.applyMatrix3(matrix.invert());
 }
 
+function sampleNormalCone(normals: THREE.Vector3[], subdivisions: number) {
+  const samples: THREE.Vector3[] = [];
+  const weights = Array.from({ length: normals.length }, () => 0);
+  const visit = (index: number, remaining: number) => {
+    if (index === normals.length - 1) {
+      weights[index] = remaining;
+      const normal = normals.reduce(
+        (sum, candidate, normalIndex) => sum.addScaledVector(candidate, weights[normalIndex]),
+        new THREE.Vector3(),
+      );
+      if (normal.lengthSq() > 0.000001) samples.push(normal.normalize());
+      return;
+    }
+    for (let weight = 0; weight <= remaining; weight += 1) {
+      weights[index] = weight;
+      visit(index + 1, remaining - weight);
+    }
+  };
+  visit(0, subdivisions);
+  return samples;
+}
+
 function roundedConvexGeometry(sharp: THREE.BufferGeometry, requestedRadius: number) {
   const faces = getFaceFrames(sharp);
   const vertices = uniqueGeometryVertices(sharp);
@@ -135,39 +162,18 @@ function roundedConvexGeometry(sharp: THREE.BufferGeometry, requestedRadius: num
   ));
   const points: THREE.Vector3[] = [];
 
-  // Original face planes remain tangent to a sphere swept around the inset solid.
+  // Densely sample every vertex's spherical normal cone. Its boundary also
+  // supplies the cylindrical edge arcs, producing a much smoother printable fillet.
   incidents.forEach((incident, vertexIndex) => {
-    incident.forEach(({ face }) => points.push(
-      insetVertices[vertexIndex].clone().addScaledVector(face.normal, radius),
-    ));
-  });
-
-  // Three samples across each normal arc make a cylindrical edge fillet.
-  edges.forEach(({ a, b, faces: [first, second] }) => {
-    [0.25, 0.5, 0.75].forEach((mix) => {
-      const normal = faces[first].normal.clone().multiplyScalar(1 - mix)
-        .addScaledVector(faces[second].normal, mix).normalize();
-      points.push(
-        insetVertices[a].clone().addScaledVector(normal, radius),
-        insetVertices[b].clone().addScaledVector(normal, radius),
-      );
+    const normals = incident.map(({ face }) => face.normal);
+    sampleNormalCone(normals, FILLET_SUBDIVISIONS).forEach((normal) => {
+      points.push(insetVertices[vertexIndex].clone().addScaledVector(normal, radius));
     });
   });
 
-  // The blended normal cap is the spherical cut at each corner (especially visible on D6).
-  incidents.forEach((incident, vertexIndex) => {
-    const cornerNormal = incident.reduce(
-      (sum, { face }) => sum.add(face.normal),
-      new THREE.Vector3(),
-    ).normalize();
-    points.push(insetVertices[vertexIndex].clone().addScaledVector(cornerNormal, radius));
-    incident.forEach(({ face }) => {
-      const blended = face.normal.clone().lerp(cornerNormal, 0.5).normalize();
-      points.push(insetVertices[vertexIndex].clone().addScaledVector(blended, radius));
-    });
-  });
-
-  const geometry = new ConvexGeometry(points);
+  const hull = new ConvexGeometry(points);
+  const geometry = mergeVertices(hull, 0.0001);
+  hull.dispose();
   geometry.computeVertexNormals();
   return geometry;
 }
@@ -179,7 +185,7 @@ function sphereCutGeometry(geometry: THREE.BufferGeometry, size: number, amount:
   const strength = THREE.MathUtils.clamp(amount, 0, 1.5);
   const sphereRadius = THREE.MathUtils.lerp(cornerRadius - 0.02, edgeRadius + 0.03, strength);
   const dieBrush = new Brush(geometry);
-  const sphereGeometry = new THREE.SphereGeometry(sphereRadius, 48, 32);
+  const sphereGeometry = new THREE.SphereGeometry(sphereRadius, 96, 64);
   const sphereBrush = new Brush(sphereGeometry);
   dieBrush.updateMatrixWorld();
   sphereBrush.updateMatrixWorld();
@@ -245,9 +251,6 @@ export function getFaceFrames(geometry: THREE.BufferGeometry): FaceFrame[] {
   }
 
   return groups.map((group) => {
-    const center = group.centroids
-      .reduce((sum, point) => sum.add(point), new THREE.Vector3())
-      .multiplyScalar(1 / group.centroids.length);
     const normal = group.normal.clone().normalize();
     const guide = Math.abs(normal.y) < 0.86
       ? new THREE.Vector3(0, 1, 0)
@@ -257,13 +260,52 @@ export function getFaceFrames(geometry: THREE.BufferGeometry): FaceFrame[] {
     const uniqueVertices = group.vertices.filter((vertex, index, all) =>
       all.findIndex((other) => other.distanceToSquared(vertex) < 0.0001) === index,
     );
+    const center = uniqueVertices
+      .reduce((sum, point) => sum.add(point), new THREE.Vector3())
+      .multiplyScalar(1 / uniqueVertices.length);
+    const polygon = uniqueVertices
+      .map((vertex) => {
+        const relative = vertex.clone().sub(center);
+        return new THREE.Vector2(relative.dot(tangent), relative.dot(bitangent));
+      })
+      .sort((a, b) => Math.atan2(a.y, a.x) - Math.atan2(b.y, b.x));
+    const inradius = Math.min(...polygon.map((point, index) => {
+      const next = polygon[(index + 1) % polygon.length];
+      const edge = next.clone().sub(point);
+      return Math.abs(edge.cross(point.clone().negate())) / edge.length();
+    }));
     const radius = Math.max(...uniqueVertices.map((vertex) => vertex.distanceTo(center))) * 0.48;
-    return { center, normal, tangent, bitangent, radius };
+    return { center, normal, tangent, bitangent, radius, inradius, polygon };
   }).sort((a, b) => {
     const elevation = b.normal.y - a.normal.y;
     if (Math.abs(elevation) > 0.02) return elevation;
     return Math.atan2(a.normal.z, a.normal.x) - Math.atan2(b.normal.z, b.normal.x);
   });
+}
+
+export function patternFillScale(patternScale: number) {
+  const amount = THREE.MathUtils.clamp((patternScale - 0.5) / 1.3, 0, 1);
+  return THREE.MathUtils.lerp(0.58, 0.98, amount);
+}
+
+export function fitCenteredRectangle(
+  frame: FaceFrame,
+  width: number,
+  height: number,
+  margin = 0.92,
+) {
+  let scale = Number.POSITIVE_INFINITY;
+  frame.polygon.forEach((point, index) => {
+    const next = frame.polygon[(index + 1) % frame.polygon.length];
+    const edge = next.clone().sub(point);
+    const length = edge.length();
+    if (length < 0.000001) return;
+    const normal = new THREE.Vector2(-edge.y / length, edge.x / length);
+    const distance = Math.abs(normal.dot(point));
+    const support = Math.abs(normal.x) * width * 0.5 + Math.abs(normal.y) * height * 0.5;
+    if (support > 0.000001) scale = Math.min(scale, distance * margin / support);
+  });
+  return Number.isFinite(scale) ? scale : 1;
 }
 
 export function getDieFaceFrames(sides: DieSides, size: number) {
