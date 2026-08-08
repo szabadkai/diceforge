@@ -55,6 +55,7 @@ export default function App() {
     sphereCut: true,
     sphereCutAmount: 0.55,
     depth: 0.65,
+    pipSize: 1.3,
     patternScale: 0.9,
     markStyle: "numbers",
     font: "helvetiker-bold",
@@ -187,7 +188,14 @@ export default function App() {
         : markStyle === "numbers" || markStyle === "pips"
           ? standardValues(current.sides)
           : current.values;
-      return { ...current, markStyle, values, faceText, randomPips: false };
+      return {
+        ...current,
+        markStyle,
+        values,
+        faceText,
+        randomPips: false,
+        depth: markStyle === "pips" ? Math.min(current.depth, current.pipSize * 0.5) : current.depth,
+      };
     });
     setPreset("custom");
     setExportState("idle");
@@ -360,12 +368,23 @@ export default function App() {
               <output>{Math.round(config.patternScale * 100)}<small>%</small></output>
             </label>
 
+            {config.markStyle === "pips" && (
+              <label className="range-row">
+                <span><b>Pip diameter</b><small>Opening width · spherical bowl</small></span>
+                <input type="range" min="0.6" max="3" step="0.05" value={config.pipSize} onChange={(event) => {
+                  const pipSize = Number(event.target.value);
+                  setConfig({ ...config, pipSize, depth: Math.min(config.depth, pipSize * 0.5) });
+                }} />
+                <output>{config.pipSize.toFixed(2)}<small>mm</small></output>
+              </label>
+            )}
+
             <label className="range-row">
               <span>
-                <b>{config.markStyle === "pips" ? "Pip radius" : "Deboss depth"}</b>
-                <small>{config.markStyle === "pips" ? "True hemispherical dimples" : "Recommended 0.4–0.8 mm"}</small>
+                <b>{config.markStyle === "pips" ? "Pip depth" : "Deboss depth"}</b>
+                <small>{config.markStyle === "pips" ? "Spherical cap · no flat bottom" : "Recommended 0.4–0.8 mm"}</small>
               </span>
-              <input type="range" min="0.3" max="1.2" step="0.05" value={config.depth} onChange={(event) => setConfig({ ...config, depth: Number(event.target.value) })} />
+              <input type="range" min="0.3" max={config.markStyle === "pips" ? Math.min(1.2, config.pipSize * 0.5) : 1.2} step="0.05" value={config.depth} onChange={(event) => setConfig({ ...config, depth: Number(event.target.value) })} />
               <output>{config.depth.toFixed(2)}<small>mm</small></output>
             </label>
           </div>

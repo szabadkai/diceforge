@@ -10,7 +10,7 @@ import {
 import { FONT_OPTIONS } from "../src/fontCatalog";
 import { pipLayout } from "../src/markTexture";
 import { printableConfigKey } from "../src/modelConfig";
-import { createHemisphericalPipCutter, hemisphericalPipRadius } from "../src/pipGeometry";
+import { createSphericalPipCutter, sphericalPipDimensions } from "../src/pipGeometry";
 import { getFont } from "../src/stlFonts";
 import { buildDiceStl, parseDiceStl } from "../src/stlExport";
 import type { DiceConfig, DieSides } from "../src/types";
@@ -156,17 +156,28 @@ test("random pip layouts are seeded, irregular, and keep the requested count", (
   assert.notDeepEqual(first, nextFace);
 });
 
-test("pip cutters are true spheres centered on the face plane", () => {
-  const radius = hemisphericalPipRadius(12, 0.8, 6, 0.65);
-  assert.equal(radius, 0.65, "pip depth must equal the hemisphere radius");
-  const cutter = createHemisphericalPipCutter(radius);
+test("pip diameter and depth produce printable spherical caps", () => {
+  const hemisphere = sphericalPipDimensions(12, 0.8, 6, 1.3, 0.65);
+  assert.deepEqual(hemisphere, {
+    openingRadius: 0.65,
+    depth: 0.65,
+    sphereRadius: 0.65,
+    centerOffset: 0,
+  });
+  const wideCap = sphericalPipDimensions(12, 0.8, 6, 2, 0.4);
+  assert.equal(wideCap.openingRadius, 1);
+  assert.equal(wideCap.depth, 0.4);
+  assert.ok(Math.abs(wideCap.sphereRadius - 1.45) < 0.000001);
+  assert.ok(Math.abs(wideCap.centerOffset - 1.05) < 0.000001);
+
+  const cutter = createSphericalPipCutter(wideCap.sphereRadius);
   const position = cutter.getAttribute("position");
   for (let vertex = 0; vertex < position.count; vertex += 1) {
     assert.ok(Math.abs(Math.hypot(
       position.getX(vertex),
       position.getY(vertex),
       position.getZ(vertex),
-    ) - radius) < 0.000001);
+    ) - wideCap.sphereRadius) < 0.000001);
   }
   cutter.dispose();
 });
@@ -186,6 +197,7 @@ test("preview cache tracks printable settings but ignores preview color", () => 
     sphereCut: true,
     sphereCutAmount: 0.55,
     depth: 0.65,
+    pipSize: 1.3,
     patternScale: 1,
     markStyle: "numbers",
     font: "helvetiker-bold",
@@ -199,6 +211,7 @@ test("preview cache tracks printable settings but ignores preview color", () => 
   };
   assert.equal(printableConfigKey(config), printableConfigKey({ ...config, color: "#ff6433" }));
   assert.notEqual(printableConfigKey(config), printableConfigKey({ ...config, patternScale: 1.05 }));
+  assert.notEqual(printableConfigKey(config), printableConfigKey({ ...config, pipSize: 1.5 }));
 });
 
 test("D6 sphere boolean cuts the rounded cube corners", () => {
@@ -220,6 +233,7 @@ test("exports a binary STL with debossed pips at maximum control ranges", async 
     sphereCut: true,
     sphereCutAmount: 1.38,
     depth: 0.55,
+    pipSize: 3,
     patternScale: 1.8,
     markStyle: "pips",
     font: "helvetiker-bold",
@@ -246,6 +260,7 @@ test("turns uploaded SVG paths into debossed geometry", async () => {
     sphereCut: false,
     sphereCutAmount: 0.55,
     depth: 0.55,
+    pipSize: 1.3,
     patternScale: 1.1,
     markStyle: "graphic",
     font: "helvetiker-bold",
@@ -270,6 +285,7 @@ test("exports custom face text with a selected printable font", async () => {
     sphereCut: false,
     sphereCutAmount: 0.55,
     depth: 0.6,
+    pipSize: 1.3,
     patternScale: 1,
     markStyle: "text",
     font: "gentilis-bold",
@@ -295,6 +311,7 @@ test("exports a watertight numbered STL for every die type", async () => {
       sphereCut: sides === 6,
       sphereCutAmount: 0.55,
       depth: 0.65,
+      pipSize: 1.3,
       patternScale: 1.8,
       markStyle: "numbers",
       font: "orbitron-bold",
@@ -312,7 +329,7 @@ test("exports a watertight numbered STL for every die type", async () => {
   }
 });
 
-test("exports watertight hemispherical pips for every die type", async () => {
+test("exports watertight configurable spherical pips for every die type", async () => {
   for (const sides of [6, 8, 10, 12, 20] as DieSides[]) {
     const config: DiceConfig = {
       sides,
@@ -321,6 +338,7 @@ test("exports watertight hemispherical pips for every die type", async () => {
       sphereCut: sides === 6,
       sphereCutAmount: 0.55,
       depth: 0.65,
+      pipSize: 2.2,
       patternScale: 1.2,
       markStyle: "pips",
       font: "helvetiker-bold",

@@ -26,6 +26,7 @@ export interface DiceConfig {
   sphereCut: boolean;
   sphereCutAmount: number;
   depth: number;
+  pipSize: number;
   patternScale: number;
   markStyle: MarkStyle;
   font: FontId;

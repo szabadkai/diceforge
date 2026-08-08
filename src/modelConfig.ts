@@ -8,6 +8,7 @@ export function printableConfigKey(config: DiceConfig) {
     config.sphereCut,
     config.sphereCutAmount,
     config.depth,
+    config.pipSize,
     config.patternScale,
     config.markStyle,
     config.font,
