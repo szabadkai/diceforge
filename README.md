@@ -6,7 +6,7 @@ Printable booleans are resolved with the Manifold geometry engine. Export tests 
 
 Current control ranges reach 4.8 mm for edge radius, 138% for the D6 sphere cut, and 180% for face-pattern scale (with geometry-aware limits on smaller solids).
 
-Optional blade-supported exports automatically orient every die tip-down, add continuous fins beneath only the spoke edges born at the first printed tip, and join them to low-profile rail feet. Each fin tapers into a continuous 0.14–0.24 mm breakaway contact line near the die, while the structural blade width remains adjustable from 0.3–1.2 mm for resin or FDM. Supported STLs are rotated Z-up and placed directly on Z=0 for slicer import; the unsupported export remains available by leaving the toggle off.
+Optional blade-supported exports automatically orient every die tip-down, add continuous fins beneath only the spoke edges born at the first printed tip, and join them to low-profile rail feet. Each fin tapers into a continuous breakaway contact line one-sixth of the selected structural width, ranging from 0.05 mm at the thinnest 0.3 mm setting to 0.2 mm at 1.2 mm. Supported STLs are rotated Z-up and placed directly on Z=0 for slicer import; the unsupported export remains available by leaving the toggle off.
 
 ## Run locally
 

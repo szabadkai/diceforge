@@ -9,7 +9,7 @@ export const BLADE_SUPPORT_FOOT_HEIGHT = 0.8;
 export const BLADE_SUPPORT_CONTACT_TAPER = 0.4;
 
 export function bladeSupportContactWidth(supportWidth: number) {
-  return THREE.MathUtils.clamp(supportWidth * 0.4, 0.14, 0.24);
+  return Math.round((supportWidth / 6) * 1_000_000) / 1_000_000;
 }
 
 type Edge = {

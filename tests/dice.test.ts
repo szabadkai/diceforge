@@ -296,9 +296,9 @@ test("blade supports orient every die onto a watertight Z=0 support base", async
 });
 
 test("blade support contact interfaces stay thinner than their structural fins", () => {
-  assert.equal(bladeSupportContactWidth(0.35), 0.14);
-  assert.equal(bladeSupportContactWidth(0.8), 0.24);
-  assert.equal(bladeSupportContactWidth(1.2), 0.24);
+  assert.equal(bladeSupportContactWidth(0.3), 0.05);
+  assert.equal(bladeSupportContactWidth(0.6), 0.1);
+  assert.equal(bladeSupportContactWidth(1.2), 0.2);
 });
 
 test("D6 sphere boolean cuts the rounded cube corners", () => {
