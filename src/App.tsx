@@ -1,7 +1,8 @@
-import { ChangeEvent, useMemo, useState } from "react";
+import { ChangeEvent, useCallback, useMemo, useState } from "react";
 import DiceScene from "./DiceScene";
 import { getDieFaceFrames } from "./diceGeometry";
 import { FONT_OPTIONS } from "./fontCatalog";
+import { printableConfigKey } from "./modelConfig";
 import type { DiceConfig, DieSides, DistributionPreset, FontId, MarkStyle } from "./types";
 import "./styles.css";
 
@@ -67,8 +68,35 @@ export default function App() {
   });
   const [preset, setPreset] = useState<DistributionPreset | "custom">("standard");
   const [exportState, setExportState] = useState<"idle" | "building" | "ready" | "error">("idle");
+  const [previewState, setPreviewState] = useState<"building" | "ready" | "error">("building");
+  const [previewModel, setPreviewModel] = useState<{ configKey: string; stl: Blob } | null>(null);
+  const [previewErrorKey, setPreviewErrorKey] = useState<string | null>(null);
   const [showFaces, setShowFaces] = useState(false);
   const [showPrintHandoff, setShowPrintHandoff] = useState(false);
+
+  const handleModelBuildStart = useCallback(() => {
+    setPreviewState("building");
+    setPreviewErrorKey(null);
+    setExportState("idle");
+  }, []);
+
+  const handleModelReady = useCallback((stl: Blob, configKey: string) => {
+    setPreviewModel({ configKey, stl });
+    setPreviewErrorKey(null);
+    setPreviewState("ready");
+  }, []);
+
+  const handleModelBuildError = useCallback((configKey: string) => {
+    setPreviewErrorKey(configKey);
+    setPreviewState("error");
+  }, []);
+
+  const currentConfigKey = printableConfigKey(config);
+  const previewIsCurrent = previewModel?.configKey === currentConfigKey;
+  const visiblePreviewState = previewErrorKey === currentConfigKey
+    ? "error"
+    : previewIsCurrent ? previewState : "building";
+  const previewStl = previewIsCurrent ? previewModel.stl : null;
 
   const estimatedVolume = useMemo(() => {
     const factor = { 6: 0.93, 8: 0.49, 10: 0.48, 12: 0.64, 20: 0.43 }[config.sides];
@@ -138,11 +166,11 @@ export default function App() {
       document.getElementById("graphic-upload")?.click();
       return;
     }
+    if (!previewStl) return;
     setExportState("building");
     try {
-      const { buildDiceStl, saveBlob } = await import("./stlExport");
-      const blob = await buildDiceStl(config);
-      saveBlob(blob, `diceforge-d${config.sides}-${config.size}mm.stl`);
+      const { saveBlob } = await import("./stlExport");
+      saveBlob(previewStl, `diceforge-d${config.sides}-${config.size}mm.stl`);
       setExportState("ready");
       if (showPrintOptions) setShowPrintHandoff(true);
     } catch (error) {
@@ -341,15 +369,27 @@ export default function App() {
         </div>
 
         <div className="preview-panel">
-          <div className="preview-topline"><span>LIVE MODEL / D{config.sides}</span><span className="live-dot">● LIVE</span></div>
-          <div className="canvas-wrap"><DiceScene config={config} /></div>
+          <div className="preview-topline">
+            <span>STL MODEL / D{config.sides}</span>
+            <span className={`live-dot ${visiblePreviewState}`}>
+              {visiblePreviewState === "building" ? "● BUILDING" : visiblePreviewState === "error" ? "● ERROR" : "● EXACT STL"}
+            </span>
+          </div>
+          <div className="canvas-wrap">
+            <DiceScene
+              config={config}
+              onBuildStart={handleModelBuildStart}
+              onModelReady={handleModelReady}
+              onBuildError={handleModelBuildError}
+            />
+          </div>
           <div className="orbit-note"><span>↻</span> DRAG TO ORBIT · SCROLL TO ZOOM</div>
           <div className="quick-export">
             {exportState === "ready" && <span className="quick-export-status">STL DOWNLOADED ✓</span>}
             {exportState === "error" && <span className="quick-export-status error">EXPORT FAILED — TRY AGAIN</span>}
-            <button type="button" onClick={() => exportModel(false)} disabled={exportState === "building"}>
+            <button type="button" onClick={() => exportModel(false)} disabled={exportState === "building" || visiblePreviewState !== "ready"}>
               <span>
-                <b>{exportState === "building" ? "BUILDING STL…" : "EXPORT MODEL"}</b>
+                <b>{visiblePreviewState === "building" ? "BUILDING STL…" : exportState === "building" ? "PREPARING DOWNLOAD…" : "EXPORT MODEL"}</b>
                 <small>D{config.sides} · {config.size} MM · BINARY STL</small>
               </span>
               <span aria-hidden="true">↓</span>
@@ -370,10 +410,10 @@ export default function App() {
           </div>
           {exportState === "error" && <p className="error-note" role="alert">The model could not be built. Try a simpler SVG or switch to numbers.</p>}
           <div className="export-actions">
-            <button type="button" className="download-button" onClick={() => exportModel(false)} disabled={exportState === "building"}>
-              <span>{exportState === "building" ? "BUILDING MODEL…" : exportState === "ready" ? "DOWNLOAD AGAIN" : "DOWNLOAD STL"}</span><span>↓</span>
+            <button type="button" className="download-button" onClick={() => exportModel(false)} disabled={exportState === "building" || visiblePreviewState !== "ready"}>
+              <span>{visiblePreviewState === "building" ? "BUILDING MODEL…" : exportState === "building" ? "PREPARING DOWNLOAD…" : exportState === "ready" ? "DOWNLOAD AGAIN" : "DOWNLOAD STL"}</span><span>↓</span>
             </button>
-            <button type="button" className="print-button" onClick={() => exportModel(true)} disabled={exportState === "building"}>
+            <button type="button" className="print-button" onClick={() => exportModel(true)} disabled={exportState === "building" || visiblePreviewState !== "ready"}>
               <span><b>PRINT WITH FORM NOW</b><small>Downloads STL, then opens print options</small></span><span>↗</span>
             </button>
           </div>

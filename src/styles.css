@@ -137,6 +137,8 @@ a { color: inherit; text-decoration: none; }
 .preview-panel::before { content: ""; position: absolute; inset: 0; pointer-events: none; background: radial-gradient(circle at 50% 36%, rgba(255,255,255,.09), transparent 38%); z-index: 1; }
 .preview-topline { height: 52px; position: absolute; left: 0; right: 0; top: 0; z-index: 2; border-bottom: 1px solid rgba(255,255,255,.15); display: flex; justify-content: space-between; align-items: center; padding: 0 22px; font: 500 9px/1 "DM Mono", monospace; letter-spacing: .1em; }
 .live-dot { color: #aee847; }
+.live-dot.building { color: #ffad78; }
+.live-dot.error { color: #ff7057; }
 .canvas-wrap { position: absolute; inset: 0 0 112px; }
 .orbit-note { position: absolute; z-index: 2; left: 22px; bottom: 130px; font: 400 8px/1 "DM Mono", monospace; color: #b6b9b0; letter-spacing: .08em; display: flex; gap: 8px; align-items: center; }
 .orbit-note span { color: var(--orange); font-size: 15px; }

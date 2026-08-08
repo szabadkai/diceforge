@@ -9,8 +9,9 @@ import {
 } from "../src/diceGeometry";
 import { FONT_OPTIONS } from "../src/fontCatalog";
 import { pipLayout } from "../src/markTexture";
+import { printableConfigKey } from "../src/modelConfig";
 import { getFont } from "../src/stlFonts";
-import { buildDiceStl } from "../src/stlExport";
+import { buildDiceStl, parseDiceStl } from "../src/stlExport";
 import type { DiceConfig, DieSides } from "../src/types";
 
 globalThis.requestAnimationFrame = ((callback: FrameRequestCallback) => {
@@ -71,6 +72,25 @@ async function assertWatertight(stl: Blob) {
   assert.ok(audit.signedVolume > 0, "triangle winding must produce a positive enclosed volume");
   assert.equal(audit.degenerateTriangles, 0, "STL must not contain zero-area triangles");
   assert.equal(audit.nonManifoldEdges, 0, "every STL edge must be shared by exactly two triangles");
+}
+
+async function assertPreviewUsesExactStl(stl: Blob) {
+  const view = new DataView(await stl.arrayBuffer());
+  const triangleCount = view.getUint32(80, true);
+  const geometry = await parseDiceStl(stl);
+  const position = geometry.getAttribute("position");
+  assert.equal(position.count, triangleCount * 3, "preview must contain every exported STL triangle");
+
+  for (let triangle = 0; triangle < triangleCount; triangle += 1) {
+    const stlOffset = 84 + triangle * 50 + 12;
+    for (let corner = 0; corner < 3; corner += 1) {
+      const vertex = triangle * 3 + corner;
+      assert.equal(position.getX(vertex), view.getFloat32(stlOffset + corner * 12, true));
+      assert.equal(position.getY(vertex), view.getFloat32(stlOffset + corner * 12 + 4, true));
+      assert.equal(position.getZ(vertex), view.getFloat32(stlOffset + corner * 12 + 8, true));
+    }
+  }
+  geometry.dispose();
 }
 
 for (const sides of [6, 8, 10, 12, 20] as DieSides[]) {
@@ -140,6 +160,29 @@ test("every font picker option creates printable outlines", () => {
   FONT_OPTIONS.forEach(({ id }) => {
     assert.ok(getFont(id).generateShapes("88", 10).length > 0, `${id} should contain printable number outlines`);
   });
+});
+
+test("preview cache tracks printable settings but ignores preview color", () => {
+  const config: DiceConfig = {
+    sides: 6,
+    size: 24,
+    edge: 1.2,
+    sphereCut: true,
+    sphereCutAmount: 0.55,
+    depth: 0.65,
+    patternScale: 1,
+    markStyle: "numbers",
+    font: "helvetiker-bold",
+    faceText: "LUCKY",
+    randomPips: false,
+    pipSeed: 42,
+    values: ["1", "2", "3", "4", "5", "6"],
+    color: "#ffffff",
+    graphicName: "",
+    graphicData: "",
+  };
+  assert.equal(printableConfigKey(config), printableConfigKey({ ...config, color: "#ff6433" }));
+  assert.notEqual(printableConfigKey(config), printableConfigKey({ ...config, patternScale: 1.05 }));
 });
 
 test("D6 sphere boolean cuts the rounded cube corners", () => {
@@ -247,6 +290,8 @@ test("exports a watertight numbered STL for every die type", async () => {
       graphicName: "",
       graphicData: "",
     };
-    await assertWatertight(await buildDiceStl(config));
+    const stl = await buildDiceStl(config);
+    await assertWatertight(stl);
+    await assertPreviewUsesExactStl(stl);
   }
 });

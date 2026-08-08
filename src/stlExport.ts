@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import ManifoldModule from "manifold-3d";
 import { STLExporter } from "three/examples/jsm/exporters/STLExporter.js";
+import { STLLoader } from "three/examples/jsm/loaders/STLLoader.js";
 import { TextGeometry } from "three/examples/jsm/geometries/TextGeometry.js";
 import { SVGLoader } from "three/examples/jsm/loaders/SVGLoader.js";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
@@ -260,6 +261,11 @@ export async function buildDiceStl(config: DiceConfig): Promise<Blob> {
     cutterGeometries.forEach((geometry) => geometry.dispose());
     baseGeometry.dispose();
   }
+}
+
+export async function parseDiceStl(stl: Blob) {
+  const loader = new STLLoader();
+  return loader.parse(await stl.arrayBuffer());
 }
 
 export function saveBlob(blob: Blob, filename: string) {
