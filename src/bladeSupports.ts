@@ -6,6 +6,11 @@ import type { DieSides } from "./types";
 export const BLADE_SUPPORT_THICKNESS = 0.35;
 export const BLADE_SUPPORT_FOOT_WIDTH = 2.2;
 export const BLADE_SUPPORT_FOOT_HEIGHT = 0.8;
+export const BLADE_SUPPORT_CONTACT_TAPER = 0.4;
+
+export function bladeSupportContactWidth(supportWidth: number) {
+  return THREE.MathUtils.clamp(supportWidth * 0.45, 0.18, 0.3);
+}
 
 type Edge = {
   a: THREE.Vector3;
@@ -107,20 +112,48 @@ function bladeGeometry(
   direction.normalize();
   const normal = new THREE.Vector3(-direction.z, 0, direction.x);
   const center = start.clone().add(end).multiplyScalar(0.5);
-  const shape = new THREE.Shape();
-  shape.moveTo(-length * 0.5, platformTop - 0.04);
-  topHeights.forEach((height, index) => {
-    const along = THREE.MathUtils.lerp(-length * 0.5, length * 0.5, index / (topHeights.length - 1));
-    shape.lineTo(along, height + 0.12);
-  });
-  shape.lineTo(length * 0.5, platformTop - 0.04);
-  shape.closePath();
-  const geometry = new THREE.ExtrudeGeometry(shape, {
-    depth: supportWidth,
-    bevelEnabled: false,
-    curveSegments: 1,
-  });
-  geometry.translate(0, 0, -supportWidth * 0.5);
+  const contactWidth = bladeSupportContactWidth(supportWidth);
+  const bottom = platformTop - 0.04;
+  const positions: number[] = [];
+  const rowCount = 4;
+  const stationCount = topHeights.length;
+
+  const station = topHeights.map((height, index) => ({
+    x: THREE.MathUtils.lerp(-length * 0.5, length * 0.5, index / (stationCount - 1)),
+    heights: [bottom, height - BLADE_SUPPORT_CONTACT_TAPER, height, height + 0.12],
+    widths: [supportWidth, supportWidth, contactWidth, contactWidth],
+  }));
+  const point = (stationIndex: number, row: number, front: boolean) => {
+    const sample = station[stationIndex];
+    return [sample.x, sample.heights[row], (front ? 0.5 : -0.5) * sample.widths[row]];
+  };
+  const triangle = (a: number[], b: number[], c: number[]) => positions.push(...a, ...b, ...c);
+  const quad = (a: number[], b: number[], c: number[], d: number[]) => {
+    triangle(a, b, c);
+    triangle(a, c, d);
+  };
+
+  for (let index = 0; index < stationCount - 1; index += 1) {
+    for (let row = 0; row < rowCount - 1; row += 1) {
+      // Broad lower fins transition into a narrow, constant-width interface
+      // before entering the die. This preserves stiffness while leaving a
+      // much smaller contact patch to clip and sand after printing.
+      quad(point(index, row, true), point(index + 1, row, true), point(index + 1, row + 1, true), point(index, row + 1, true));
+      quad(point(index, row, false), point(index, row + 1, false), point(index + 1, row + 1, false), point(index + 1, row, false));
+    }
+    quad(point(index, rowCount - 1, false), point(index, rowCount - 1, true), point(index + 1, rowCount - 1, true), point(index + 1, rowCount - 1, false));
+    quad(point(index, 0, true), point(index, 0, false), point(index + 1, 0, false), point(index + 1, 0, true));
+  }
+
+  for (let row = 0; row < rowCount - 1; row += 1) {
+    quad(point(0, row, false), point(0, row, true), point(0, row + 1, true), point(0, row + 1, false));
+    const last = stationCount - 1;
+    quad(point(last, row, false), point(last, row + 1, false), point(last, row + 1, true), point(last, row, true));
+  }
+
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+  geometry.computeVertexNormals();
   geometry.applyMatrix4(new THREE.Matrix4().makeBasis(
     direction,
     new THREE.Vector3(0, 1, 0),
