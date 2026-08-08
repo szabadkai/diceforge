@@ -17,7 +17,7 @@ import { createSphericalPipCutter, sphericalPipDimensions } from "../src/pipGeom
 import { getFont } from "../src/stlFonts";
 import { splitFaceWords, TEXT_PRESETS, textPresetValues, textWordValues } from "../src/textPresets";
 import { buildDiceStl, parseDiceStl } from "../src/stlExport";
-import { bladeSupportContactWidth } from "../src/bladeSupports";
+import { bladeSupportContactWidth, bladeSupportHubRadii } from "../src/bladeSupports";
 import type { DiceConfig, DieSides } from "../src/types";
 
 globalThis.requestAnimationFrame = ((callback: FrameRequestCallback) => {
@@ -299,6 +299,8 @@ test("blade support contact interfaces stay thinner than their structural fins",
   assert.equal(bladeSupportContactWidth(0.3), 0.05);
   assert.equal(bladeSupportContactWidth(0.6), 0.1);
   assert.equal(bladeSupportContactWidth(1.2), 0.2);
+  assert.deepEqual(bladeSupportHubRadii(0.3), { contact: 0.025, sphere: 0.15, column: 0.108 });
+  assert.deepEqual(bladeSupportHubRadii(1.2), { contact: 0.1, sphere: 0.2, column: 0.144 });
 });
 
 test("D6 sphere boolean cuts the rounded cube corners", () => {

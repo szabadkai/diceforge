@@ -12,6 +12,16 @@ export function bladeSupportContactWidth(supportWidth: number) {
   return Math.round((supportWidth / 6) * 1_000_000) / 1_000_000;
 }
 
+export function bladeSupportHubRadii(supportWidth: number) {
+  const contact = bladeSupportContactWidth(supportWidth) * 0.5;
+  const sphere = Math.max(0.15, contact * 2);
+  return {
+    contact,
+    sphere,
+    column: Math.round((sphere * 0.72) * 1_000_000) / 1_000_000,
+  };
+}
+
 type Edge = {
   a: THREE.Vector3;
   b: THREE.Vector3;
@@ -228,15 +238,24 @@ export function createBladeSupportLayout(
   const tipHeight = rayHeight(raycaster, mesh, 0, 0, rayFloor);
   if (tipHeight !== undefined) {
     const hubBottom = platformTop - 0.04;
-    const hubHeight = tipHeight + 0.12 - hubBottom;
-    const hub = new THREE.CylinderGeometry(
-      Math.max(0.9, supportWidth * 1.6),
-      Math.max(0.9, supportWidth * 1.6),
-      hubHeight,
+    const hubRadii = bladeSupportHubRadii(supportWidth);
+    // Sink only a spherical cap into the first printed tip. The intersection
+    // circle retains the same controlled diameter as the blade interfaces,
+    // while the post joins well inside the sphere's lower hemisphere.
+    const sphereOffset = Math.sqrt(hubRadii.sphere ** 2 - hubRadii.contact ** 2);
+    const sphereCenter = tipHeight - sphereOffset;
+    const postTop = sphereCenter - hubRadii.sphere * 0.35;
+    const postHeight = postTop - hubBottom;
+    const hubPost = new THREE.CylinderGeometry(
+      hubRadii.column,
+      hubRadii.column,
+      postHeight,
       32,
     );
-    hub.translate(0, hubBottom + hubHeight * 0.5, 0);
-    supportGeometries.push(hub);
+    hubPost.translate(0, hubBottom + postHeight * 0.5, 0);
+    const hubContact = new THREE.SphereGeometry(hubRadii.sphere, 32, 20);
+    hubContact.translate(0, sphereCenter, 0);
+    supportGeometries.push(hubPost, hubContact);
   }
 
   edges.forEach((edge) => {
