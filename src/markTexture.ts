@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import { patternFillScale } from "./diceGeometry";
-import { getCanvasFont } from "./fontCatalog";
+import { getCanvasFont, getCanvasFontWeight } from "./fontCatalog";
 import type { FontId, MarkStyle } from "./types";
 
 const PIP_LAYOUTS: Record<number, Array<[number, number]>> = {
@@ -80,6 +80,8 @@ export function createMarkTexture(
   const context = canvas.getContext("2d")!;
   const ink = "#171915";
   const fill = patternFillScale(patternScale);
+  const canvasFont = getCanvasFont(font);
+  const canvasFontWeight = getCanvasFontWeight(font);
 
   const drawRecessedText = (text: string, x: number, y: number) => {
     context.fillStyle = "rgba(255,255,255,.48)";
@@ -106,13 +108,13 @@ export function createMarkTexture(
     context.textAlign = "center";
     context.textBaseline = "middle";
     let fontSize = 280;
-    context.font = `800 ${fontSize}px ${getCanvasFont(font)}`;
+    context.font = `${canvasFontWeight} ${fontSize}px ${canvasFont}`;
     const measured = context.measureText(value || " ");
     const measuredHeight = Math.max(1, measured.actualBoundingBoxAscent + measured.actualBoundingBoxDescent);
     const maxWidth = 320 * fill;
     const maxHeight = 270 * fill;
     fontSize *= Math.min(maxWidth / Math.max(1, measured.width), maxHeight / measuredHeight, 1);
-    context.font = `800 ${fontSize}px ${getCanvasFont(font)}`;
+    context.font = `${canvasFontWeight} ${fontSize}px ${canvasFont}`;
     drawRecessedText(value, 192, 198);
   };
 
@@ -161,5 +163,11 @@ export function createMarkTexture(
   const texture = new THREE.CanvasTexture(canvas);
   texture.colorSpace = THREE.SRGBColorSpace;
   texture.anisotropy = 8;
+  if ((style === "numbers" || style === "text") && document.fonts) {
+    document.fonts.load(`${canvasFontWeight} 64px ${canvasFont}`).then(() => {
+      drawText();
+      texture.needsUpdate = true;
+    }).catch(() => undefined);
+  }
   return texture;
 }

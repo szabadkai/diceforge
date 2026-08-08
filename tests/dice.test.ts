@@ -7,7 +7,9 @@ import {
   getDieFaceFrames,
   patternFillScale,
 } from "../src/diceGeometry";
+import { FONT_OPTIONS } from "../src/fontCatalog";
 import { pipLayout } from "../src/markTexture";
+import { getFont } from "../src/stlFonts";
 import { buildDiceStl } from "../src/stlExport";
 import type { DiceConfig, DieSides } from "../src/types";
 
@@ -77,6 +79,13 @@ test("random pip layouts are seeded, irregular, and keep the requested count", (
   assert.deepEqual(first, repeat);
   assert.notDeepEqual(first, regular);
   assert.notDeepEqual(first, nextFace);
+});
+
+test("every font picker option creates printable outlines", () => {
+  assert.equal(FONT_OPTIONS.length, 16);
+  FONT_OPTIONS.forEach(({ id }) => {
+    assert.ok(getFont(id).generateShapes("88", 10).length > 0, `${id} should contain printable number outlines`);
+  });
 });
 
 test("D6 sphere boolean cuts the rounded cube corners", () => {

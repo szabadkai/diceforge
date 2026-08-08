@@ -5,10 +5,19 @@ export type FontId =
   | "helvetiker-bold"
   | "helvetiker-regular"
   | "optimer-bold"
+  | "optimer-regular"
   | "gentilis-bold"
+  | "gentilis-regular"
   | "droid-sans-bold"
+  | "droid-sans-regular"
   | "droid-serif-bold"
-  | "droid-mono";
+  | "droid-serif-regular"
+  | "droid-mono"
+  | "bungee"
+  | "orbitron-bold"
+  | "oswald-bold"
+  | "cinzel-bold"
+  | "space-mono-bold";
 
 export interface DiceConfig {
   sides: DieSides;
