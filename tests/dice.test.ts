@@ -17,7 +17,7 @@ import { createSphericalPipCutter, sphericalPipDimensions } from "../src/pipGeom
 import { getFont } from "../src/stlFonts";
 import { splitFaceWords, TEXT_PRESETS, textPresetValues, textWordValues } from "../src/textPresets";
 import { buildDiceStl, parseDiceStl } from "../src/stlExport";
-import { bladeSupportContactWidth } from "../src/bladeSupports";
+import { bladeSupportContactIntervals, bladeSupportContactWidth } from "../src/bladeSupports";
 import type { DiceConfig, DieSides } from "../src/types";
 
 globalThis.requestAnimationFrame = ((callback: FrameRequestCallback) => {
@@ -296,9 +296,19 @@ test("blade supports orient every die onto a watertight Z=0 support base", async
 });
 
 test("blade support contact interfaces stay thinner than their structural fins", () => {
-  assert.equal(bladeSupportContactWidth(0.35), 0.18);
-  assert.equal(bladeSupportContactWidth(0.8), 0.3);
-  assert.equal(bladeSupportContactWidth(1.2), 0.3);
+  assert.equal(bladeSupportContactWidth(0.35), 0.14);
+  assert.equal(bladeSupportContactWidth(0.8), 0.24);
+  assert.equal(bladeSupportContactWidth(1.2), 0.24);
+});
+
+test("blade support contacts leave removal gaps along the fin", () => {
+  const intervals = bladeSupportContactIntervals(8);
+  assert.ok(intervals.length > 1);
+  assert.ok(intervals[0].start > -4);
+  assert.ok(intervals.at(-1)!.end < 4);
+  intervals.slice(1).forEach((interval, index) => {
+    assert.ok(interval.start > intervals[index].end);
+  });
 });
 
 test("D6 sphere boolean cuts the rounded cube corners", () => {
