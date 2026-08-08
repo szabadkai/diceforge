@@ -10,6 +10,7 @@ import {
 import { FONT_OPTIONS } from "../src/fontCatalog";
 import { pipLayout } from "../src/markTexture";
 import { printableConfigKey } from "../src/modelConfig";
+import { createHemisphericalPipCutter, hemisphericalPipRadius } from "../src/pipGeometry";
 import { getFont } from "../src/stlFonts";
 import { buildDiceStl, parseDiceStl } from "../src/stlExport";
 import type { DiceConfig, DieSides } from "../src/types";
@@ -66,12 +67,12 @@ async function auditBinaryStl(stl: Blob) {
   };
 }
 
-async function assertWatertight(stl: Blob) {
+async function assertWatertight(stl: Blob, label = "STL") {
   const audit = await auditBinaryStl(stl);
   assert.ok(audit.triangleCount > 0);
-  assert.ok(audit.signedVolume > 0, "triangle winding must produce a positive enclosed volume");
-  assert.equal(audit.degenerateTriangles, 0, "STL must not contain zero-area triangles");
-  assert.equal(audit.nonManifoldEdges, 0, "every STL edge must be shared by exactly two triangles");
+  assert.ok(audit.signedVolume > 0, `${label} triangle winding must produce a positive enclosed volume`);
+  assert.equal(audit.degenerateTriangles, 0, `${label} must not contain zero-area triangles`);
+  assert.equal(audit.nonManifoldEdges, 0, `${label} must share every edge between exactly two triangles`);
 }
 
 async function assertPreviewUsesExactStl(stl: Blob) {
@@ -153,6 +154,21 @@ test("random pip layouts are seeded, irregular, and keep the requested count", (
   assert.deepEqual(first, repeat);
   assert.notDeepEqual(first, regular);
   assert.notDeepEqual(first, nextFace);
+});
+
+test("pip cutters are true spheres centered on the face plane", () => {
+  const radius = hemisphericalPipRadius(12, 0.8, 6, 0.65);
+  assert.equal(radius, 0.65, "pip depth must equal the hemisphere radius");
+  const cutter = createHemisphericalPipCutter(radius);
+  const position = cutter.getAttribute("position");
+  for (let vertex = 0; vertex < position.count; vertex += 1) {
+    assert.ok(Math.abs(Math.hypot(
+      position.getX(vertex),
+      position.getY(vertex),
+      position.getZ(vertex),
+    ) - radius) < 0.000001);
+  }
+  cutter.dispose();
 });
 
 test("every font picker option creates printable outlines", () => {
@@ -291,7 +307,33 @@ test("exports a watertight numbered STL for every die type", async () => {
       graphicData: "",
     };
     const stl = await buildDiceStl(config);
-    await assertWatertight(stl);
+    await assertWatertight(stl, `D${sides} numbered STL`);
+    await assertPreviewUsesExactStl(stl);
+  }
+});
+
+test("exports watertight hemispherical pips for every die type", async () => {
+  for (const sides of [6, 8, 10, 12, 20] as DieSides[]) {
+    const config: DiceConfig = {
+      sides,
+      size: 24,
+      edge: 1.2,
+      sphereCut: sides === 6,
+      sphereCutAmount: 0.55,
+      depth: 0.65,
+      patternScale: 1.2,
+      markStyle: "pips",
+      font: "helvetiker-bold",
+      faceText: "LUCKY",
+      randomPips: false,
+      pipSeed: 42,
+      values: Array.from({ length: sides }, (_, index) => String(sides === 10 ? index : index + 1)),
+      color: "#ffffff",
+      graphicName: "",
+      graphicData: "",
+    };
+    const stl = await buildDiceStl(config);
+    await assertWatertight(stl, `D${sides} pip STL`);
     await assertPreviewUsesExactStl(stl);
   }
 });

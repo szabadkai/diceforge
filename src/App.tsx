@@ -361,7 +361,10 @@ export default function App() {
             </label>
 
             <label className="range-row">
-              <span><b>Deboss depth</b><small>Recommended 0.4–0.8 mm</small></span>
+              <span>
+                <b>{config.markStyle === "pips" ? "Pip radius" : "Deboss depth"}</b>
+                <small>{config.markStyle === "pips" ? "True hemispherical dimples" : "Recommended 0.4–0.8 mm"}</small>
+              </span>
               <input type="range" min="0.3" max="1.2" step="0.05" value={config.depth} onChange={(event) => setConfig({ ...config, depth: Number(event.target.value) })} />
               <output>{config.depth.toFixed(2)}<small>mm</small></output>
             </label>

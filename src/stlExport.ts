@@ -16,6 +16,7 @@ import {
 import type { FaceFrame } from "./diceGeometry";
 import { getFont } from "./stlFonts";
 import { pipLayout } from "./markTexture";
+import { createHemisphericalPipCutter, hemisphericalPipRadius } from "./pipGeometry";
 import type { DiceConfig } from "./types";
 
 type LoadedManifoldModule = Awaited<ReturnType<typeof ManifoldModule>>;
@@ -116,21 +117,17 @@ function makePipCutters(config: DiceConfig, frames: FaceFrame[]) {
   frames.slice(0, config.sides).forEach((frame, faceIndex) => {
     const layout = pipLayout(config.values[faceIndex], config.randomPips, config.pipSeed, faceIndex);
     if (!layout.length) return;
-    const radius = Math.min(
-      frame.inradius * 0.13 * fill / Math.max(1, Math.sqrt(layout.length / 6)),
-      0.92,
-    );
+    const radius = hemisphericalPipRadius(frame.inradius, fill, layout.length, config.depth);
     layout.forEach(([x, y]) => {
-      const cylinder = new THREE.CylinderGeometry(radius, radius * 0.9, config.depth * 2.2, 48, 1, false);
-      const quaternion = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), frame.normal);
-      cylinder.applyQuaternion(quaternion);
+      const sphere = createHemisphericalPipCutter(radius);
       const position = frame.center
         .clone()
         .addScaledVector(frame.tangent, x * frame.inradius * 1.8 * fill)
-        .addScaledVector(frame.bitangent, y * frame.inradius * 1.8 * fill)
-        .addScaledVector(frame.normal, -config.depth * 0.2);
-      cylinder.translate(position.x, position.y, position.z);
-      cutters.push(cylinder);
+        .addScaledVector(frame.bitangent, y * frame.inradius * 1.8 * fill);
+      // The sphere center sits on the face plane, so exactly one hemisphere
+      // intersects the die and becomes the printable pip dimple.
+      sphere.translate(position.x, position.y, position.z);
+      cutters.push(sphere);
     });
   });
   return cutters;
