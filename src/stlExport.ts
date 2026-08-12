@@ -205,7 +205,13 @@ function makeGraphicCutters(config: DiceConfig, frames: FaceFrame[]) {
       if (!source) return [];
       const { bounds, dimensions } = source;
       if (!dimensions.x || !dimensions.y) return [];
-      const scale = fitCenteredRectangle(frame, dimensions.x, dimensions.y) * fill;
+      const rotation = config.graphicRotations?.length
+        ? config.graphicRotations[faceIndex % config.graphicRotations.length]
+        : 0;
+      const angle = THREE.MathUtils.degToRad(rotation);
+      const rotatedWidth = Math.abs(dimensions.x * Math.cos(angle)) + Math.abs(dimensions.y * Math.sin(angle));
+      const rotatedHeight = Math.abs(dimensions.x * Math.sin(angle)) + Math.abs(dimensions.y * Math.cos(angle));
+      const scale = fitCenteredRectangle(frame, rotatedWidth, rotatedHeight) * fill;
       return source.geometries.map((sourceGeometry) => {
         const geometry = sourceGeometry.clone();
         geometry.translate(
@@ -214,6 +220,7 @@ function makeGraphicCutters(config: DiceConfig, frames: FaceFrame[]) {
           -config.depth * 0.8,
         );
         geometry.scale(scale, -scale, 1);
+        geometry.rotateZ(-angle);
         return orientGeometry(geometry, frame);
       });
     });

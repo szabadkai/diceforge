@@ -40,6 +40,7 @@ export interface DiceConfig {
   graphicSetId?: string;
   graphicDataSet?: string[];
   graphicNames?: string[];
+  graphicRotations?: number[];
   bladeSupports?: boolean;
   bladeSupportWidth?: number;
 }
