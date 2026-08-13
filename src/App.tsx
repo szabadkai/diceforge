@@ -1,9 +1,10 @@
 import { ChangeEvent, DragEvent, KeyboardEvent, useCallback, useMemo, useState } from "react";
+import { BLADE_SUPPORT_CONTACT_NECK, bladeSupportContactWidth } from "./bladeSupports";
 import DiceScene from "./DiceScene";
 import { getDieFaceFrames } from "./diceGeometry";
 import { FONT_OPTIONS } from "./fontCatalog";
 import { DEFAULT_GRAPHIC_THEME, GRAPHIC_THEMES } from "./graphicThemes";
-import { fillFaceSet, swapFaceAssignments } from "./graphicSet";
+import { fillFaceSet, removeGraphicAssignments, setFaceRotation, swapFaceAssignments } from "./graphicSet";
 import { printableConfigKey } from "./modelConfig";
 import { MAX_PIP_DIAMETER } from "./pipGeometry";
 import { splitFaceWords, TEXT_PRESETS, textPresetValues, textWordValues } from "./textPresets";
@@ -83,6 +84,7 @@ export default function App() {
     graphicSetId: "",
     graphicDataSet: [],
     graphicNames: [],
+    graphicRotations: [],
     bladeSupports: false,
     bladeSupportWidth: 0.35,
   });
@@ -130,6 +132,8 @@ export default function App() {
 
   const customWords = useMemo(() => splitFaceWords(customText), [customText]);
   const exportFilename = `diceforge-d${config.sides}-${config.size}mm${config.bladeSupports ? "-blade-supported" : ""}.stl`;
+  const bladeWidth = config.bladeSupportWidth ?? 0.35;
+  const bladeContactWidth = bladeSupportContactWidth(bladeWidth);
 
   const selectSides = (sides: DieSides) => {
     setConfig((current) => ({
@@ -214,6 +218,7 @@ export default function App() {
         graphicSetId: "custom",
         graphicDataSet,
         graphicNames: files.map((file) => file.name),
+        graphicRotations: Array.from({ length: files.length }, () => 0),
       }));
       setGraphicUploadState("idle");
       setExportState("idle");
@@ -231,17 +236,72 @@ export default function App() {
       const names = current.graphicNames?.length
         ? current.graphicNames
         : [current.graphicName || "Custom SVG"];
+      const rotations = current.graphicRotations?.length ? current.graphicRotations : [0];
       return {
         ...current,
         graphicData: "",
         graphicDataSet: swapFaceAssignments(graphics, from, to, current.sides),
         graphicNames: swapFaceAssignments(names, from, to, current.sides),
+        graphicRotations: swapFaceAssignments(rotations, from, to, current.sides),
       };
     });
     setExportState("idle");
   };
 
+  const rotateGraphicFace = (faceIndex: number, rotation: number) => {
+    setConfig((current) => ({
+      ...current,
+      graphicRotations: setFaceRotation(
+        current.graphicRotations ?? [],
+        faceIndex,
+        rotation,
+        current.sides,
+      ),
+    }));
+    setExportState("idle");
+  };
+
+  const removeGraphic = (graphicData: string) => {
+    setConfig((current) => {
+      const graphics = current.graphicDataSet?.length
+        ? current.graphicDataSet
+        : current.graphicData ? [current.graphicData] : [];
+      const remaining = removeGraphicAssignments(
+        graphics,
+        current.graphicNames ?? [],
+        current.graphicRotations ?? [],
+        graphicData,
+      );
+      return {
+        ...current,
+        graphicName: remaining.graphics.length === 1
+          ? remaining.names[0]
+          : remaining.graphics.length ? `${remaining.graphics.length} custom SVGs` : "",
+        graphicData: "",
+        graphicDataSet: remaining.graphics,
+        graphicNames: remaining.names,
+        graphicRotations: remaining.rotations,
+      };
+    });
+    setExportState("idle");
+  };
+
+  const clearGraphicSet = () => {
+    setConfig((current) => ({
+      ...current,
+      graphicName: "",
+      graphicData: "",
+      graphicSetId: "custom",
+      graphicDataSet: [],
+      graphicNames: [],
+      graphicRotations: [],
+    }));
+    setGraphicUploadState("idle");
+    setExportState("idle");
+  };
+
   const handleGraphicKey = (event: KeyboardEvent<HTMLDivElement>, index: number) => {
+    if ((event.target as HTMLElement).closest("input, button")) return;
     const direction = event.key === "ArrowLeft" || event.key === "ArrowUp"
       ? -1
       : event.key === "ArrowRight" || event.key === "ArrowDown" ? 1 : 0;
@@ -316,6 +376,7 @@ export default function App() {
       graphicSetId: theme.id,
       graphicDataSet: theme.marks,
       graphicNames: [],
+      graphicRotations: [],
       color: theme.paper,
     }));
     setPreset("custom");
@@ -327,6 +388,9 @@ export default function App() {
     : [];
   const customGraphicNames = config.graphicSetId === "custom"
     ? fillFaceSet(config.graphicNames?.length ? config.graphicNames : [config.graphicName || "Custom SVG"], config.sides)
+    : [];
+  const customGraphicRotations = config.graphicSetId === "custom"
+    ? fillFaceSet(config.graphicRotations?.length ? config.graphicRotations : [0], config.sides)
     : [];
 
   return (
@@ -509,10 +573,14 @@ export default function App() {
                   <input id="graphic-upload" type="file" accept="image/svg+xml,.svg" multiple onChange={uploadGraphics} />
                   <span className="upload-icon">＋</span>
                   <span>
-                    <b>{graphicUploadState === "reading" ? "Reading your SVGs…" : config.graphicSetId === "custom" ? config.graphicName : "Upload your own set"}</b>
+                    <b>{graphicUploadState === "reading"
+                      ? "Reading your SVGs…"
+                      : config.graphicSetId === "custom" && (config.graphicData || config.graphicDataSet?.length)
+                        ? config.graphicName
+                        : "Upload your own set"}</b>
                     <small>Select 1–20 SVGs · file order fills the faces</small>
                   </span>
-                  <em>{config.graphicSetId === "custom" ? "REPLACE SET" : "CHOOSE FILES"}</em>
+                  <em>{config.graphicSetId === "custom" && (config.graphicData || config.graphicDataSet?.length) ? "REPLACE SET" : "CHOOSE FILES"}</em>
                 </label>
                 {graphicUploadState === "error" && <p className="graphic-upload-error" role="alert">Choose one or more valid SVG files.</p>}
                 {customGraphics.length > 0 && (
@@ -520,9 +588,12 @@ export default function App() {
                     <div className="graphic-set-editor-heading">
                       <span>
                         <b id="graphic-set-title">Face assignments</b>
-                        <small>Drag cards to swap · arrow keys also work</small>
+                        <small>Drag cards to swap · rotate each mark through 360°</small>
                       </span>
-                      <span>D{config.sides} / {config.sides} FACES</span>
+                      <div className="graphic-set-editor-actions">
+                        <span>D{config.sides} / {config.sides} FACES</span>
+                        <button type="button" onClick={clearGraphicSet}>CLEAR SET</button>
+                      </div>
                     </div>
                     <div className="graphic-face-grid" role="list" aria-label={`SVG assignments for ${config.sides} faces`}>
                       {customGraphics.map((graphic, index) => (
@@ -531,14 +602,8 @@ export default function App() {
                           key={index}
                           role="listitem"
                           tabIndex={0}
-                          draggable
                           aria-label={`Face ${index + 1}: ${customGraphicNames[index]}`}
                           onKeyDown={(event) => handleGraphicKey(event, index)}
-                          onDragStart={(event) => {
-                            event.dataTransfer.effectAllowed = "move";
-                            event.dataTransfer.setData("text/plain", String(index));
-                            setDraggedGraphicFace(index);
-                          }}
                           onDragOver={(event) => {
                             event.preventDefault();
                             event.dataTransfer.dropEffect = "move";
@@ -546,18 +611,51 @@ export default function App() {
                           }}
                           onDragLeave={() => setGraphicDropTarget((current) => current === index ? null : current)}
                           onDrop={(event) => handleGraphicDrop(event, index)}
-                          onDragEnd={() => {
-                            setDraggedGraphicFace(null);
-                            setGraphicDropTarget(null);
-                          }}
                         >
-                          <div className="graphic-face-card-top"><span>F{String(index + 1).padStart(2, "0")}</span><i aria-hidden="true">⠿</i></div>
-                          <img src={graphic} alt="" draggable={false} />
-                          <small title={customGraphicNames[index]}>{customGraphicNames[index]}</small>
-                          <div className="graphic-face-moves">
-                            <button type="button" disabled={index === 0} aria-label={`Move face ${index + 1} backward`} onClick={() => swapGraphicFaces(index, index - 1)}>←</button>
-                            <button type="button" disabled={index === config.sides - 1} aria-label={`Move face ${index + 1} forward`} onClick={() => swapGraphicFaces(index, index + 1)}>→</button>
+                          <div className="graphic-face-card-top">
+                            <span>F{String(index + 1).padStart(2, "0")}</span>
+                            <span className="graphic-face-card-actions">
+                              <button
+                                type="button"
+                                aria-label={`Remove ${customGraphicNames[index]} from custom set`}
+                                title="Remove SVG from set"
+                                onClick={() => removeGraphic(graphic)}
+                              >×</button>
+                              <i
+                                draggable
+                                aria-label={`Drag face ${index + 1} to reorder`}
+                                onDragStart={(event) => {
+                                  event.dataTransfer.effectAllowed = "move";
+                                  event.dataTransfer.setData("text/plain", String(index));
+                                  setDraggedGraphicFace(index);
+                                }}
+                                onDragEnd={() => {
+                                  setDraggedGraphicFace(null);
+                                  setGraphicDropTarget(null);
+                                }}
+                              >⠿</i>
+                            </span>
                           </div>
+                          <img
+                            src={graphic}
+                            alt=""
+                            draggable={false}
+                            style={{ transform: `rotate(${customGraphicRotations[index]}deg)` }}
+                          />
+                          <small title={customGraphicNames[index]}>{customGraphicNames[index]}</small>
+                          <label className="graphic-face-rotation">
+                            <span>ANGLE</span>
+                            <input
+                              type="range"
+                              min="0"
+                              max="360"
+                              step="1"
+                              value={customGraphicRotations[index]}
+                              aria-label={`Rotate face ${index + 1}`}
+                              onInput={(event) => rotateGraphicFace(index, Number(event.currentTarget.value))}
+                            />
+                            <output>{customGraphicRotations[index]}°</output>
+                          </label>
                         </div>
                       ))}
                     </div>
@@ -635,16 +733,16 @@ export default function App() {
             </div>
             {config.bladeSupports && (
               <label className="range-row blade-support-width">
-                <span><b>Support width</b><small>0.35 resin · 0.8+ FDM</small></span>
+                <span><b>Support width</b><small>{bladeContactWidth.toFixed(3)} MM CONTACT · {BLADE_SUPPORT_CONTACT_NECK.toFixed(2)} MM NECK</small></span>
                 <input
                   type="range"
                   min="0.3"
                   max="1.2"
                   step="0.05"
-                  value={config.bladeSupportWidth ?? 0.35}
+                  value={bladeWidth}
                   onChange={(event) => setConfig({ ...config, bladeSupportWidth: Number(event.target.value) })}
                 />
-                <output>{(config.bladeSupportWidth ?? 0.35).toFixed(2)}<small>mm</small></output>
+                <output>{bladeWidth.toFixed(2)}<small>mm fin</small></output>
               </label>
             )}
           </div>
@@ -779,7 +877,7 @@ export default function App() {
               <section id="support-die">
                 <span className="chapter-number">03 / SUPPORTS</span>
                 <h3>Support edges, not artwork.</h3>
-                <p>Generated blade supports place continuous fins beneath the spoke edges that begin at the first printed tip, then join them to low rail feet. Each fin tapers into a continuous breakaway line one-sixth of its structural width, reaching 0.05 mm at the thinnest setting for cleaner removal on 50-micron resin printers. A narrow straight central column leaves room for the radial fins beside it and ends in a spherical contact with the same intersection diameter. Later perimeter edges are omitted because the solid layers below already carry them. Set the structural width near 0.35 mm for resin or 0.8 mm and above for a sturdier fin.</p>
+                <p>Generated blade supports place continuous fins beneath the spoke edges that begin at the first printed tip, then join them to low rail feet. Each fin tapers into an exposed 0.2 mm breakaway neck one-sixth of its structural width, reaching 0.05 mm at the thinnest setting for cleaner removal on 50-micron resin printers. A narrow straight central column leaves room for the radial fins beside it and ends in a spherical contact with the same intersection diameter. Later perimeter edges are omitted because the solid layers below already carry them. Set the structural width near 0.35 mm for resin or 0.8 mm and above for a sturdier fin.</p>
                 <div className="do-dont-grid">
                   <div><span>DO</span><b>Inspect every generated fin</b><p>Scrub the slicer layers and confirm the rails sit flat, the first tip is anchored, and no new island appears unsupported.</p></div>
                   <div><span>AVOID</span><b>Tips inside marks or on face centers</b><p>Supports in numbers, pips, and broad cosmetic areas are difficult to remove without visible craters.</p></div>

@@ -7,6 +7,7 @@ export const BLADE_SUPPORT_THICKNESS = 0.35;
 export const BLADE_SUPPORT_FOOT_WIDTH = 2.2;
 export const BLADE_SUPPORT_FOOT_HEIGHT = 0.8;
 export const BLADE_SUPPORT_CONTACT_TAPER = 0.4;
+export const BLADE_SUPPORT_CONTACT_NECK = 0.2;
 
 export function bladeSupportContactWidth(supportWidth: number) {
   return Math.round((supportWidth / 6) * 1_000_000) / 1_000_000;
@@ -125,13 +126,19 @@ function bladeGeometry(
   const contactWidth = bladeSupportContactWidth(supportWidth);
   const bottom = platformTop - 0.04;
   const positions: number[] = [];
-  const rowCount = 4;
+  const rowCount = 5;
   const stationCount = topHeights.length;
 
   const station = topHeights.map((height, index) => ({
     x: THREE.MathUtils.lerp(-length * 0.5, length * 0.5, index / (stationCount - 1)),
-    heights: [bottom, height - BLADE_SUPPORT_CONTACT_TAPER, height, height + 0.12],
-    widths: [supportWidth, supportWidth, contactWidth, contactWidth],
+    heights: [
+      bottom,
+      height - BLADE_SUPPORT_CONTACT_NECK - BLADE_SUPPORT_CONTACT_TAPER,
+      height - BLADE_SUPPORT_CONTACT_NECK,
+      height,
+      height + 0.12,
+    ],
+    widths: [supportWidth, supportWidth, contactWidth, contactWidth, contactWidth],
   }));
   const point = (stationIndex: number, row: number, front: boolean) => {
     const sample = station[stationIndex];

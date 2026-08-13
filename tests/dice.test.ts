@@ -10,14 +10,14 @@ import {
   patternFillScale,
 } from "../src/diceGeometry";
 import { FONT_OPTIONS } from "../src/fontCatalog";
-import { fillFaceSet, swapFaceAssignments } from "../src/graphicSet";
+import { fillFaceSet, removeGraphicAssignments, setFaceRotation, swapFaceAssignments } from "../src/graphicSet";
 import { pipLayout } from "../src/markTexture";
 import { printableConfigKey } from "../src/modelConfig";
 import { createSphericalPipCutter, sphericalPipDimensions } from "../src/pipGeometry";
 import { getFont } from "../src/stlFonts";
 import { splitFaceWords, TEXT_PRESETS, textPresetValues, textWordValues } from "../src/textPresets";
 import { buildDiceStl, parseDiceStl } from "../src/stlExport";
-import { bladeSupportContactWidth, bladeSupportHubRadii } from "../src/bladeSupports";
+import { BLADE_SUPPORT_CONTACT_NECK, bladeSupportContactWidth, bladeSupportHubRadii } from "../src/bladeSupports";
 import type { DiceConfig, DieSides } from "../src/types";
 
 globalThis.requestAnimationFrame = ((callback: FrameRequestCallback) => {
@@ -37,6 +37,29 @@ test("custom SVG face assignments swap after expanding the active die", () => {
   assert.deepEqual(swapFaceAssignments(["leaf", "moon", "duck"], 0, 4, 6), [
     "moon", "moon", "duck", "leaf", "leaf", "duck",
   ]);
+});
+
+test("custom SVG rotations support the full degree range and follow face swaps", () => {
+  const rotated = setFaceRotation([0, 90], 2, 273, 6);
+  assert.deepEqual(rotated, [0, 90, 273, 90, 0, 90]);
+  assert.deepEqual(swapFaceAssignments(rotated, 2, 4, 6), [0, 90, 0, 90, 273, 90]);
+  assert.equal(setFaceRotation([], 0, 361, 1)[0], 360);
+});
+
+test("removing a custom SVG also removes its aligned name and rotation", () => {
+  assert.deepEqual(
+    removeGraphicAssignments(
+      ["leaf", "moon", "leaf", "duck"],
+      ["leaf.svg", "moon.svg", "leaf.svg", "duck.svg"],
+      [15, 90, 210, 330],
+      "leaf",
+    ),
+    {
+      graphics: ["moon", "duck"],
+      names: ["moon.svg", "duck.svg"],
+      rotations: [90, 330],
+    },
+  );
 });
 
 async function auditBinaryStl(stl: Blob) {
@@ -256,6 +279,7 @@ test("preview cache tracks printable settings but ignores preview color", () => 
   assert.notEqual(printableConfigKey(config), printableConfigKey({ ...config, patternScale: 1.05 }));
   assert.notEqual(printableConfigKey(config), printableConfigKey({ ...config, pipSize: 1.5 }));
   assert.notEqual(printableConfigKey(config), printableConfigKey({ ...config, graphicDataSet: ["theme-mark"] }));
+  assert.notEqual(printableConfigKey(config), printableConfigKey({ ...config, graphicRotations: [90] }));
   assert.notEqual(printableConfigKey(config), printableConfigKey({ ...config, bladeSupports: true }));
   assert.notEqual(printableConfigKey(config), printableConfigKey({ ...config, bladeSupportWidth: 0.8 }));
 });
@@ -296,6 +320,7 @@ test("blade supports orient every die onto a watertight Z=0 support base", async
 });
 
 test("blade support contact interfaces stay thinner than their structural fins", () => {
+  assert.equal(BLADE_SUPPORT_CONTACT_NECK, 0.2);
   assert.equal(bladeSupportContactWidth(0.3), 0.05);
   assert.equal(bladeSupportContactWidth(0.6), 0.1);
   assert.equal(bladeSupportContactWidth(1.2), 0.2);
@@ -360,6 +385,7 @@ test("turns uploaded SVG paths into debossed geometry", async () => {
     color: "#ffffff",
     graphicName: "mark.svg",
     graphicData: `data:image/svg+xml;base64,${btoa(svg)}`,
+    graphicRotations: [90],
   };
   const stl = await buildDiceStl(config);
   assert.ok(stl.size > 10_000);
