@@ -283,6 +283,7 @@ export async function buildDiceStl(config: DiceConfig): Promise<Blob> {
         config.sides,
         config.size,
         config.bladeSupportWidth,
+        config.bladeSupportContactStyle,
       );
       finishedBody.dispose();
       const orientedBody = geometryToManifold(manifold, layout.bodyGeometry);

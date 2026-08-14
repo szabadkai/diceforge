@@ -87,6 +87,7 @@ export default function App() {
     graphicRotations: [],
     bladeSupports: false,
     bladeSupportWidth: 0.35,
+    bladeSupportContactStyle: "straight",
   });
   const [preset, setPreset] = useState<DistributionPreset | "custom">("standard");
   const [textPreset, setTextPreset] = useState<TextPresetId | "custom">("custom");
@@ -134,6 +135,7 @@ export default function App() {
   const exportFilename = `diceforge-d${config.sides}-${config.size}mm${config.bladeSupports ? "-blade-supported" : ""}.stl`;
   const bladeWidth = config.bladeSupportWidth ?? 0.35;
   const bladeContactWidth = bladeSupportContactWidth(bladeWidth);
+  const bladeContactStyle = config.bladeSupportContactStyle ?? "straight";
 
   const selectSides = (sides: DieSides) => {
     setConfig((current) => ({
@@ -719,7 +721,7 @@ export default function App() {
             </label>
 
             <div className="toggle-row blade-support-toggle">
-              <span><b>Blade supports</b><small>AUTO ORIENT · EDGE FINS · Z=0 FEET</small></span>
+              <span><b>Blade supports</b><small>AUTO ORIENT · REMOVABLE EDGE · Z=0 FEET</small></span>
               <button
                 type="button"
                 role="switch"
@@ -732,18 +734,43 @@ export default function App() {
               ><i /></button>
             </div>
             {config.bladeSupports && (
-              <label className="range-row blade-support-width">
-                <span><b>Support width</b><small>{bladeContactWidth.toFixed(3)} MM CONTACT · {BLADE_SUPPORT_CONTACT_NECK.toFixed(2)} MM NECK</small></span>
-                <input
-                  type="range"
-                  min="0.3"
-                  max="1.2"
-                  step="0.05"
-                  value={bladeWidth}
-                  onChange={(event) => setConfig({ ...config, bladeSupportWidth: Number(event.target.value) })}
-                />
-                <output>{bladeWidth.toFixed(2)}<small>mm fin</small></output>
-              </label>
+              <>
+                <div className="support-contact-style">
+                  <span><b>Contact style</b><small>THREE BLADE-EDGE PROFILES</small></span>
+                  <div role="group" aria-label="Support contact style">
+                    <button
+                      type="button"
+                      aria-pressed={bladeContactStyle === "straight"}
+                      className={bladeContactStyle === "straight" ? "selected" : ""}
+                      onClick={() => setConfig({ ...config, bladeSupportContactStyle: "straight" })}
+                    >STRAIGHT EDGE</button>
+                    <button
+                      type="button"
+                      aria-pressed={bladeContactStyle === "staggered"}
+                      className={bladeContactStyle === "staggered" ? "selected" : ""}
+                      onClick={() => setConfig({ ...config, bladeSupportContactStyle: "staggered" })}
+                    >STAGGERED EDGE</button>
+                    <button
+                      type="button"
+                      aria-pressed={bladeContactStyle === "dotted"}
+                      className={bladeContactStyle === "dotted" ? "selected" : ""}
+                      onClick={() => setConfig({ ...config, bladeSupportContactStyle: "dotted" })}
+                    >DOTTED EDGE</button>
+                  </div>
+                </div>
+                <label className="range-row blade-support-width">
+                  <span><b>Support width</b><small>{bladeContactWidth.toFixed(3)} MM CONTACT · {BLADE_SUPPORT_CONTACT_NECK.toFixed(2)} MM NECK</small></span>
+                  <input
+                    type="range"
+                    min="0.3"
+                    max="1.2"
+                    step="0.05"
+                    value={bladeWidth}
+                    onChange={(event) => setConfig({ ...config, bladeSupportWidth: Number(event.target.value) })}
+                  />
+                  <output>{bladeWidth.toFixed(2)}<small>mm fin</small></output>
+                </label>
+              </>
             )}
           </div>
         </div>
@@ -877,7 +904,7 @@ export default function App() {
               <section id="support-die">
                 <span className="chapter-number">03 / SUPPORTS</span>
                 <h3>Support edges, not artwork.</h3>
-                <p>Generated blade supports place continuous fins beneath the spoke edges that begin at the first printed tip, then join them to low rail feet. Each fin tapers into an exposed 0.2 mm breakaway neck one-sixth of its structural width, reaching 0.05 mm at the thinnest setting for cleaner removal on 50-micron resin printers. A narrow straight central column leaves room for the radial fins beside it and ends in a spherical contact with the same intersection diameter. Later perimeter edges are omitted because the solid layers below already carry them. Set the structural width near 0.35 mm for resin or 0.8 mm and above for a sturdier fin.</p>
+                <p>Generated blade supports place strong fins beneath the spoke edges that begin at the first printed tip, then join them to low rail feet. Straight edge keeps the conventional continuous contact line. Staggered edge keeps that line continuous but shifts it from side to side for progressive peeling. Dotted edge interrupts only the thin interface into short 0.9 mm blade segments about 2.4 mm apart—the contacts remain flat blades, not round posts. All three styles use an exposed 0.2 mm neck one-sixth of the selected structural width, reaching 0.05 mm at the thinnest setting. A narrow straight central column supports the first tip. Later perimeter edges are omitted because the solid layers below already carry them.</p>
                 <div className="do-dont-grid">
                   <div><span>DO</span><b>Inspect every generated fin</b><p>Scrub the slicer layers and confirm the rails sit flat, the first tip is anchored, and no new island appears unsupported.</p></div>
                   <div><span>AVOID</span><b>Tips inside marks or on face centers</b><p>Supports in numbers, pips, and broad cosmetic areas are difficult to remove without visible craters.</p></div>

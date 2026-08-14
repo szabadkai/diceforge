@@ -17,8 +17,15 @@ import { createSphericalPipCutter, sphericalPipDimensions } from "../src/pipGeom
 import { getFont } from "../src/stlFonts";
 import { splitFaceWords, TEXT_PRESETS, textPresetValues, textWordValues } from "../src/textPresets";
 import { buildDiceStl, parseDiceStl } from "../src/stlExport";
-import { BLADE_SUPPORT_CONTACT_NECK, bladeSupportContactWidth, bladeSupportHubRadii } from "../src/bladeSupports";
-import type { DiceConfig, DieSides } from "../src/types";
+import {
+  BLADE_SUPPORT_CONTACT_EDGE_INSET,
+  BLADE_SUPPORT_CONTACT_NECK,
+  BLADE_SUPPORT_CONTACT_SPACING,
+  BLADE_SUPPORT_DOTTED_SEGMENT_LENGTH,
+  bladeSupportContactWidth,
+  bladeSupportHubRadii,
+} from "../src/bladeSupports";
+import type { BladeSupportContactStyle, DiceConfig, DieSides } from "../src/types";
 
 globalThis.requestAnimationFrame = ((callback: FrameRequestCallback) => {
   callback(0);
@@ -282,45 +289,52 @@ test("preview cache tracks printable settings but ignores preview color", () => 
   assert.notEqual(printableConfigKey(config), printableConfigKey({ ...config, graphicRotations: [90] }));
   assert.notEqual(printableConfigKey(config), printableConfigKey({ ...config, bladeSupports: true }));
   assert.notEqual(printableConfigKey(config), printableConfigKey({ ...config, bladeSupportWidth: 0.8 }));
+  assert.notEqual(printableConfigKey(config), printableConfigKey({ ...config, bladeSupportContactStyle: "dotted" }));
 });
 
-test("blade supports orient every die onto a watertight Z=0 support base", async () => {
-  for (const sides of [6, 8, 10, 12, 20] as DieSides[]) {
-    const config: DiceConfig = {
-      sides,
-      size: 24,
-      edge: 1.2,
-      sphereCut: sides === 6,
-      sphereCutAmount: 0.55,
-      depth: 0.65,
-      pipSize: 1.3,
-      patternScale: 0.9,
-      markStyle: "numbers",
-      font: "helvetiker-bold",
-      faceText: "",
-      randomPips: false,
-      pipSeed: 42,
-      values: Array.from({ length: sides }, () => ""),
-      color: "#ffffff",
-      graphicName: "",
-      graphicData: "",
-      bladeSupports: true,
-      bladeSupportWidth: sides === 20 ? 0.8 : 0.35,
-    };
-    const stl = await buildDiceStl(config);
-    await assertWatertight(stl, `D${sides} blade-supported STL`);
-    const geometry = await parseDiceStl(stl);
-    geometry.computeBoundingBox();
-    assert.ok(Math.abs(geometry.boundingBox!.min.z) < 0.0001, `D${sides} supports must sit on Z=0`);
-    assert.ok(geometry.boundingBox!.max.z > config.size, `D${sides} must be lifted above its support base`);
-    const dimensions = geometry.boundingBox!.getSize(new Vector3());
-    assert.ok(Math.max(dimensions.x, dimensions.y, dimensions.z) < config.size * 2.2, `D${sides} support layout must remain compact`);
-    geometry.dispose();
+test("all blade contact styles orient every die onto a watertight Z=0 support base", async () => {
+  for (const contactStyle of ["straight", "staggered", "dotted"] as BladeSupportContactStyle[]) {
+    for (const sides of [6, 8, 10, 12, 20] as DieSides[]) {
+      const config: DiceConfig = {
+        sides,
+        size: 24,
+        edge: 1.2,
+        sphereCut: sides === 6,
+        sphereCutAmount: 0.55,
+        depth: 0.65,
+        pipSize: 1.3,
+        patternScale: 0.9,
+        markStyle: "numbers",
+        font: "helvetiker-bold",
+        faceText: "",
+        randomPips: false,
+        pipSeed: 42,
+        values: Array.from({ length: sides }, () => ""),
+        color: "#ffffff",
+        graphicName: "",
+        graphicData: "",
+        bladeSupports: true,
+        bladeSupportWidth: sides === 20 ? 0.8 : 0.35,
+        bladeSupportContactStyle: contactStyle,
+      };
+      const stl = await buildDiceStl(config);
+      await assertWatertight(stl, `D${sides} ${contactStyle} blade-supported STL`);
+      const geometry = await parseDiceStl(stl);
+      geometry.computeBoundingBox();
+      assert.ok(Math.abs(geometry.boundingBox!.min.z) < 0.0001, `D${sides} supports must sit on Z=0`);
+      assert.ok(geometry.boundingBox!.max.z > config.size, `D${sides} must be lifted above its support base`);
+      const dimensions = geometry.boundingBox!.getSize(new Vector3());
+      assert.ok(Math.max(dimensions.x, dimensions.y, dimensions.z) < config.size * 2.2, `D${sides} support layout must remain compact`);
+      geometry.dispose();
+    }
   }
 });
 
-test("blade support contact interfaces stay thinner than their structural fins", () => {
+test("blade support contacts are thin, inset, and spaced for clean removal", () => {
   assert.equal(BLADE_SUPPORT_CONTACT_NECK, 0.2);
+  assert.equal(BLADE_SUPPORT_CONTACT_SPACING, 2.4);
+  assert.equal(BLADE_SUPPORT_CONTACT_EDGE_INSET, 0.7);
+  assert.equal(BLADE_SUPPORT_DOTTED_SEGMENT_LENGTH, 0.9);
   assert.equal(bladeSupportContactWidth(0.3), 0.05);
   assert.equal(bladeSupportContactWidth(0.6), 0.1);
   assert.equal(bladeSupportContactWidth(1.2), 0.2);

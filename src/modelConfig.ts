@@ -21,5 +21,6 @@ export function printableConfigKey(config: DiceConfig) {
     config.graphicRotations,
     Boolean(config.bladeSupports),
     config.bladeSupportWidth ?? 0.35,
+    config.bladeSupportContactStyle ?? "straight",
   ]);
 }
