@@ -2,18 +2,19 @@ import assert from "node:assert/strict";
 import { readdirSync, readFileSync } from "node:fs";
 import test from "node:test";
 import { DOMParser } from "@xmldom/xmldom";
-import { Vector3 } from "three";
+import { Vector2, Vector3 } from "three";
 import {
   createDieGeometry,
   fitCenteredRectangle,
+  getD6SphereCutRadius,
   getDieFaceFrames,
   patternFillScale,
 } from "../src/diceGeometry";
 import { FONT_OPTIONS } from "../src/fontCatalog";
 import { fillFaceSet, removeGraphicAssignments, setFaceRotation, swapFaceAssignments } from "../src/graphicSet";
-import { pipLayout } from "../src/markTexture";
+import { balancePipValues, dicePipLayouts, facePipLayout, pipLayout } from "../src/markTexture";
 import { printableConfigKey } from "../src/modelConfig";
-import { createSphericalPipCutter, sphericalPipDimensions } from "../src/pipGeometry";
+import { createSphericalPipCutter, sphericalCapCentroidDepth, sphericalPipDimensions } from "../src/pipGeometry";
 import { getFont } from "../src/stlFonts";
 import { splitFaceWords, TEXT_PRESETS, textPresetValues, textWordValues } from "../src/textPresets";
 import { buildDiceStl, parseDiceStl } from "../src/stlExport";
@@ -202,6 +203,59 @@ test("random pip layouts are seeded, irregular, and keep the requested count", (
   assert.deepEqual(first, repeat);
   assert.notDeepEqual(first, regular);
   assert.notDeepEqual(first, nextFace);
+  assert.ok(Math.abs(first.reduce((sum, [x]) => sum + x, 0)) < 0.000000001);
+  assert.ok(Math.abs(first.reduce((sum, [, y]) => sum + y, 0)) < 0.000000001);
+});
+
+test("non-square pip layouts fill their face polygon and remain centered", () => {
+  for (const sides of [8, 10, 12, 20] as DieSides[]) {
+    const frame = getDieFaceFrames(sides, 24)[0];
+    for (const random of [false, true]) {
+      const layout = facePipLayout("12", frame, 1.8, 1.3, random, 42, 0);
+      assert.equal(layout.length, 12);
+      assert.ok(Math.abs(layout.reduce((sum, [x]) => sum + x, 0)) < 0.000001, `D${sides} x centroid`);
+      assert.ok(Math.abs(layout.reduce((sum, [, y]) => sum + y, 0)) < 0.000001, `D${sides} y centroid`);
+      layout.forEach((point) => {
+        frame.polygon.forEach((start, index) => {
+          const end = frame.polygon[(index + 1) % frame.polygon.length];
+          const edge = end.clone().sub(start);
+          const originSide = edge.cross(start.clone().negate());
+          const pointSide = edge.cross(new Vector2(point[0], point[1]).sub(start));
+          assert.ok((originSide < 0 ? -pointSide : pointSide) / edge.length() >= 0.79);
+        });
+      });
+    }
+  }
+});
+
+test("balanced random layouts cancel their first moment across the whole die", () => {
+  for (const sides of [6, 8, 10, 12, 20] as DieSides[]) {
+    const frames = getDieFaceFrames(sides, 24);
+    const sourceValues = Array.from({ length: sides }, (_, index) => String(sides === 10 ? index : index + 1));
+    const dimensions = sphericalPipDimensions(1.3, 0.65);
+    const inset = sphericalCapCentroidDepth(dimensions.sphereRadius, dimensions.depth);
+    const values = balancePipValues(sourceValues, frames, inset, 42);
+    assert.deepEqual([...values].sort((a, b) => Number(a) - Number(b)), sourceValues);
+    const layouts = dicePipLayouts(values, frames, 0.9, 1.3, true, 42, sides === 6, inset);
+    const moment = layouts.reduce((sum, layout, faceIndex) => {
+      const frame = frames[faceIndex];
+      const facePoint = frame.center.clone().addScaledVector(frame.normal, -inset);
+      layout.forEach(([x, y]) => sum
+        .add(facePoint)
+        .addScaledVector(frame.tangent, x)
+        .addScaledVector(frame.bitangent, y));
+      return sum;
+    }, new Vector3());
+    assert.ok(moment.length() < 0.001, `D${sides} random pip moment was ${moment.length()}`);
+    layouts.forEach((layout) => {
+      layout.forEach((point, index) => layout.slice(0, index).forEach((other) => {
+        assert.ok(
+          Math.hypot(point[0] - other[0], point[1] - other[1]) >= 1.3,
+          `D${sides} pips must not overlap at the default 1.3 mm diameter`,
+        );
+      }));
+    });
+  }
 });
 
 test("pip diameter and depth produce printable spherical caps", () => {
@@ -212,6 +266,7 @@ test("pip diameter and depth produce printable spherical caps", () => {
     sphereRadius: 0.65,
     centerOffset: 0,
   });
+  assert.ok(Math.abs(sphericalCapCentroidDepth(0.65, 0.65) - 0.65 * 3 / 8) < 0.000000001);
   const wideCap = sphericalPipDimensions(2, 0.4);
   assert.equal(wideCap.openingRadius, 1);
   assert.equal(wideCap.depth, 0.4);
@@ -351,6 +406,10 @@ test("D6 sphere boolean cuts the rounded cube corners", () => {
   );
   filleted.dispose();
   sphereCut.dispose();
+});
+
+test("zero-percent D6 corner cut uses a fully circumscribed sphere", () => {
+  assert.ok(getD6SphereCutRadius(24, 0) > Math.sqrt(3) * 12);
 });
 
 test("exports a binary STL with debossed pips at maximum control ranges", async () => {

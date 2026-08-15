@@ -15,8 +15,8 @@ import {
 } from "./diceGeometry";
 import type { FaceFrame } from "./diceGeometry";
 import { getFont } from "./stlFonts";
-import { pipLayout } from "./markTexture";
-import { createSphericalPipCutter, sphericalPipDimensions } from "./pipGeometry";
+import { dicePipLayouts } from "./markTexture";
+import { createSphericalPipCutter, sphericalCapCentroidDepth, sphericalPipDimensions } from "./pipGeometry";
 import type { DiceConfig } from "./types";
 import { createBladeSupportLayout, placeBladeSupportsOnSlicerPlatform } from "./bladeSupports";
 
@@ -114,20 +114,26 @@ function orientGeometry(geometry: THREE.BufferGeometry, frame: FaceFrame) {
 
 function makePipCutters(config: DiceConfig, frames: FaceFrame[]) {
   const cutters: THREE.BufferGeometry[] = [];
-  const fill = patternFillScale(config.patternScale);
+  const dimensions = sphericalPipDimensions(config.pipSize, config.depth);
+  const layouts = dicePipLayouts(
+    config.values,
+    frames.slice(0, config.sides),
+    config.patternScale,
+    config.pipSize,
+    config.randomPips,
+    config.pipSeed,
+    config.sides === 6,
+    sphericalCapCentroidDepth(dimensions.sphereRadius, dimensions.depth),
+  );
   frames.slice(0, config.sides).forEach((frame, faceIndex) => {
-    const layout = pipLayout(config.values[faceIndex], config.randomPips, config.pipSeed, faceIndex);
+    const layout = layouts[faceIndex];
     if (!layout.length) return;
-    const dimensions = sphericalPipDimensions(
-      config.pipSize,
-      config.depth,
-    );
     layout.forEach(([x, y]) => {
       const sphere = createSphericalPipCutter(dimensions.sphereRadius);
       const position = frame.center
         .clone()
-        .addScaledVector(frame.tangent, x * frame.inradius * 1.8 * fill)
-        .addScaledVector(frame.bitangent, y * frame.inradius * 1.8 * fill)
+        .addScaledVector(frame.tangent, x)
+        .addScaledVector(frame.bitangent, y)
         .addScaledVector(frame.normal, dimensions.centerOffset);
       // Moving the sphere center outward creates a wider spherical cap. When
       // diameter / 2 equals depth, the center lies on the face: a hemisphere.

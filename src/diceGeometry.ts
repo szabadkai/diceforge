@@ -183,7 +183,9 @@ export function getD6SphereCutRadius(size: number, amount: number) {
   const cornerRadius = Math.sqrt(3) * half;
   const edgeRadius = Math.sqrt(2) * half;
   const strength = THREE.MathUtils.clamp(amount, 0, 1.5);
-  return THREE.MathUtils.lerp(cornerRadius - 0.02, edgeRadius + 0.03, strength);
+  // At zero the sphere fully contains the rounded die, making 0% a genuine
+  // no-cut setting instead of applying the previous tiny corner shave.
+  return THREE.MathUtils.lerp(cornerRadius + 0.02, edgeRadius + 0.03, strength);
 }
 
 function sphereCutGeometry(geometry: THREE.BufferGeometry, size: number, amount: number) {

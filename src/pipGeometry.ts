@@ -29,6 +29,12 @@ export function sphericalPipDimensions(
   };
 }
 
+export function sphericalCapCentroidDepth(radius: number, depth: number) {
+  // Distance from the face plane into the die to the centroid of the removed
+  // spherical cap. A hemisphere is 3r/8; a very shallow cap approaches h/3.
+  return depth * (4 * radius - depth) / (4 * (3 * radius - depth));
+}
+
 export function createSphericalPipCutter(radius: number) {
   const sphere = new THREE.SphereGeometry(radius, 32, 16);
   // Keep the tessellation seams away from the die's symmetric face planes.

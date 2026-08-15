@@ -5,8 +5,9 @@ import { getDieFaceFrames } from "./diceGeometry";
 import { FONT_OPTIONS } from "./fontCatalog";
 import { DEFAULT_GRAPHIC_THEME, GRAPHIC_THEMES } from "./graphicThemes";
 import { fillFaceSet, removeGraphicAssignments, setFaceRotation, swapFaceAssignments } from "./graphicSet";
+import { balancePipValues } from "./markTexture";
 import { printableConfigKey } from "./modelConfig";
-import { MAX_PIP_DIAMETER } from "./pipGeometry";
+import { MAX_PIP_DIAMETER, sphericalCapCentroidDepth, sphericalPipDimensions } from "./pipGeometry";
 import { splitFaceWords, TEXT_PRESETS, textPresetValues, textWordValues } from "./textPresets";
 import type { DiceConfig, DieSides, DistributionPreset, FontId, MarkStyle } from "./types";
 import type { TextPresetId } from "./textPresets";
@@ -156,18 +157,29 @@ export default function App() {
 
   const applyPreset = (nextPreset: DistributionPreset) => {
     const randomPipLayout = nextPreset === "random" && config.markStyle === "pips";
+    const pipSeed = randomPipLayout ? Math.floor(Math.random() * 2_000_000_000) : config.pipSeed;
     const values = nextPreset === "standard"
       ? standardValues(config.sides)
       : nextPreset === "opposites"
         ? oppositeValues(config.sides)
         : nextPreset === "random"
-          ? randomPipLayout ? config.values : shuffleValues(config.sides)
+          ? randomPipLayout
+            ? (() => {
+              const dimensions = sphericalPipDimensions(config.pipSize, config.depth);
+              return balancePipValues(
+                config.values,
+                getDieFaceFrames(config.sides, config.size),
+                sphericalCapCentroidDepth(dimensions.sphereRadius, dimensions.depth),
+                pipSeed,
+              );
+            })()
+            : shuffleValues(config.sides)
           : Array.from({ length: config.sides }, () => "");
     setConfig((current) => ({
       ...current,
       values,
       randomPips: randomPipLayout,
-      pipSeed: randomPipLayout ? Math.floor(Math.random() * 2_000_000_000) : current.pipSeed,
+      pipSeed: randomPipLayout ? pipSeed : current.pipSeed,
     }));
     setPreset(nextPreset);
     setExportState("idle");
@@ -467,7 +479,7 @@ export default function App() {
                 {config.sphereCut && (
                   <label className="range-row sphere-cut-strength">
                     <span><b>Corner cut</b><small>Sphere intersection depth</small></span>
-                    <input type="range" min="0.12" max="1.38" step="0.02" value={config.sphereCutAmount} onChange={(event) => setConfig({ ...config, sphereCutAmount: Number(event.target.value) })} />
+                    <input type="range" min="0" max="1.38" step="0.02" value={config.sphereCutAmount} onChange={(event) => setConfig({ ...config, sphereCutAmount: Number(event.target.value) })} />
                     <output>{Math.round(config.sphereCutAmount * 100)}<small>%</small></output>
                   </label>
                 )}
@@ -672,7 +684,7 @@ export default function App() {
                 <div className="preset-row">
                   {(["standard", "opposites", "random", "blank"] as DistributionPreset[]).map((option) => (
                     <button key={option} type="button" className={preset === option ? "selected" : ""} onClick={() => applyPreset(option)}>
-                      {option === "random" ? config.markStyle === "pips" ? "random pips" : "shuffle" : option}
+                      {option === "random" ? config.markStyle === "pips" ? "balanced random" : "shuffle" : option}
                     </button>
                   ))}
                 </div>
