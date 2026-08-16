@@ -562,7 +562,7 @@ export default function App() {
             {config.markStyle === "graphic" && (
               <div className="graphic-picker">
                 <div className="graphic-picker-heading">
-                  <span><b>Built-in collections</b><small>Six marks cycle across every die size</small></span>
+                  <span><b>Built-in collections</b><small>Marks cycle across every die size</small></span>
                   <span>{GRAPHIC_THEMES.length} SETS</span>
                 </div>
                 <div className="theme-grid" role="group" aria-label="Built-in graphic sets">

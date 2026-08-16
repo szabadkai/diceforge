@@ -1,0 +1,4 @@
+<!-- NES Super Mario Bros. standing sprite, converted to one gap-free orthogonal contour. Source: https://www.mariouniverse.com/sprites-nes-smb/ -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 13 16" shape-rendering="crispEdges">
+  <path fill-rule="evenodd" d="M4 0H10V1H11V3H12V6H10V7H11V8H12V9H13V13H11V14H12V15H13V16H8V14H7V13H6V14H5V16H0V15H1V14H2V13H0V9H1V8H4V7H2V6H1V5H0V4H1V3H3V2H1V1H4ZM8.85 3.15H8.15V3.85H8.85Z"/>
+</svg>

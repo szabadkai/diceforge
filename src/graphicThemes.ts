@@ -31,6 +31,15 @@ function theme(
 }
 
 export const GRAPHIC_THEMES: GraphicTheme[] = [
+  theme("mushroom-kingdom", "Mushroom Kingdom", "Power-ups · blocks · adventure", "#e33b2f", "#fff0d8", [
+    "mario", "bullet-bill", "mushroom", "fire-flower", "question-block", "super-star",
+  ]),
+  theme("formlabs", "Formlabs", "Official Form 4 sample-part art", "#ff6a13", "#f4f2ec", [
+    "butterfly", "game-controller", "led-light-bar", "robotic-finger", "tower-cap", "connector",
+  ]),
+  theme("japanese", "Japanese motifs", "Tradition · nature · craft", "#d84a3a", "#fbf1e5", [
+    "torii", "mount-fuji", "sakura", "koi", "folding-fan", "daruma",
+  ]),
   theme("starfall", "Starfall", "Orbit · omen · eclipse", "#7ba9ff", "#e9efff", [
     "sun", "moon", "star", "planet", "comet", "eye",
   ]),

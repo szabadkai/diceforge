@@ -1,0 +1,4 @@
+<!-- NES Super Mario Bros. sprite geometry; merged to gap-free orthogonal engraving paths. Source: https://www.mariouniverse.com/sprites-nes-smb/ -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 14" shape-rendering="crispEdges">
+  <path fill-rule="evenodd" d="M0 0H2V2H3V0H10V1H12V2H13V3H14V4H15V5H16V9H15V10H14V11H13V12H12V13H10V14H3V12H2V14H0ZM8.85 1.15H4.15V1.85H8.85Z"/>
+</svg>
