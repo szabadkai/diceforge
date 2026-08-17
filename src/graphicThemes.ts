@@ -34,6 +34,42 @@ export const GRAPHIC_THEMES: GraphicTheme[] = [
   theme("mushroom-kingdom", "Mushroom Kingdom", "Power-ups · blocks · adventure", "#e33b2f", "#fff0d8", [
     "mario", "bullet-bill", "mushroom", "fire-flower", "question-block", "super-star",
   ]),
+  theme("animal-companions", "Animal companions", "Whiskers · paws · cuddles", "#e06f61", "#fff0e8", [
+    "cat", "dog", "bear", "mouse", "rabbit", "poodle",
+  ]),
+  theme("farmyard-friends", "Farmyard friends", "Hooves · feathers · happy hatches", "#d58a35", "#fff3d9", [
+    "horse", "pig", "cow", "chicken", "chick", "duck",
+  ]),
+  theme("wild-world", "Wild world", "Stripes · trunks · big adventures", "#c66c35", "#f8ead9", [
+    "fox", "zebra", "kangaroo", "giraffe", "elephant", "tiger",
+  ]),
+  theme("treetop-friends", "Treetop friends", "Wings · tails · woodland hellos", "#66924c", "#eaf3df", [
+    "monkey", "squirrel", "hedgehog", "bird", "owl", "parrot",
+  ]),
+  theme("water-world", "Water world", "Ponds · rivers · ocean splashes", "#338fa8", "#e1f3f4", [
+    "frog", "snake", "crocodile", "snail", "turtle", "fish",
+  ]),
+  theme("ocean-explorers", "Ocean explorers", "Flippers · fins · wiggly arms", "#347fbd", "#e5f0fa", [
+    "seal", "penguin", "dolphin", "shrimp", "crab", "octopus",
+  ]),
+  theme("tiny-creatures", "Tiny creatures", "Shells · spots · busy little legs", "#9b6e3c", "#f5eddb", [
+    "caterpillar", "ladybug", "bee", "butterfly", "ant", "spider",
+  ]),
+  theme("things-that-go", "Things that go", "Roads · rails · sky · sea", "#df623e", "#faebe2", [
+    "car", "bus", "train", "airplane", "ship", "truck",
+  ]),
+  theme("yummy-fruit", "Yummy fruit", "Crunchy · juicy · sweet", "#e55252", "#fceaea", [
+    "apple", "banana", "strawberry", "watermelon", "orange", "pear",
+  ]),
+  theme("playtime", "Playtime", "Bounce · build · imagine", "#8b6ac8", "#f0eafa", [
+    "ball", "teddy-bear", "kite", "balloon", "puzzle-piece", "bicycle",
+  ]),
+  theme("weather-and-sky", "Weather & sky", "Sunshine · rainbows · bedtime stars", "#4d8fc5", "#e7f2fa", [
+    "sun", "cloud", "rainbow", "snowflake", "moon", "star",
+  ]),
+  theme("feelings", "Feelings", "Happy · sad · silly · sleepy", "#d96a98", "#fae9f1", [
+    "happy", "sad", "wink", "sleepy", "surprised", "silly",
+  ]),
   theme("formlabs", "Formlabs", "Official Form 4 sample-part art", "#ff6a13", "#f4f2ec", [
     "butterfly", "game-controller", "led-light-bar", "robotic-finger", "tower-cap", "connector",
   ]),

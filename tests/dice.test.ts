@@ -41,6 +41,14 @@ test("custom SVG sets cycle in file order to fill every face", () => {
   assert.deepEqual(fillFaceSet([], 6), []);
 });
 
+test("every built-in graphic collection maps exactly onto a D6", () => {
+  const root = new URL("../src/assets/dice-themes/", import.meta.url);
+  for (const theme of readdirSync(root)) {
+    const marks = readdirSync(new URL(`${theme}/`, root)).filter((item) => item.endsWith(".svg"));
+    assert.equal(marks.length, 6, `${theme} must contain exactly six SVG marks`);
+  }
+});
+
 test("custom SVG face assignments swap after expanding the active die", () => {
   assert.deepEqual(swapFaceAssignments(["leaf", "moon", "duck"], 0, 4, 6), [
     "moon", "moon", "duck", "leaf", "leaf", "duck",
