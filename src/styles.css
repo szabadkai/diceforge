@@ -170,10 +170,13 @@ a { color: inherit; text-decoration: none; }
 .graphic-face-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); max-height: 420px; overflow: auto; padding: 10px; gap: 8px; background: #ece9e2; }
 .graphic-face-card { min-width: 0; position: relative; padding: 7px; border: 1px solid #c8c4b9; background: #fff; outline: none; transition: border-color .15s, box-shadow .15s, opacity .15s, transform .15s; }
 .graphic-face-card:hover, .graphic-face-card:focus-visible { border-color: var(--orange); box-shadow: 0 0 0 1px var(--orange); }
+.graphic-face-card.selectable { cursor: pointer; }
+.graphic-face-card.selectable.active { border-color: var(--orange); box-shadow: inset 0 0 0 2px var(--orange); }
 .graphic-face-card.dragging { opacity: .38; transform: scale(.96); }
 .graphic-face-card.drop-target { border-color: var(--orange); box-shadow: inset 0 0 0 2px var(--orange); }
 .graphic-face-card-top { display: flex; align-items: center; justify-content: space-between; color: #8a8c84; font: 500 7px/1 "DM Mono", monospace; }
 .graphic-face-card-actions { display: flex; align-items: center; gap: 6px; }
+.graphic-face-card-actions b { color: var(--orange); font: 500 6px/1 "DM Mono", monospace; letter-spacing: .05em; }
 .graphic-face-card-actions button { width: 15px; height: 15px; border: 0; border-radius: 50%; padding: 0; background: #ece9e2; color: #777970; cursor: pointer; font: 500 11px/14px "DM Mono", monospace; }
 .graphic-face-card-actions button:hover { background: #a82e15; color: #fff; }
 .graphic-face-card-actions i { color: var(--orange); cursor: grab; font-style: normal; font-size: 13px; line-height: .7; }
@@ -186,6 +189,18 @@ a { color: inherit; text-decoration: none; }
 .graphic-face-rotation input { grid-column: 1 / -1; appearance: none; width: 100%; height: 2px; margin: 3px 0; border-radius: 2px; background: #c8c5bc; accent-color: var(--orange); cursor: ew-resize; }
 .graphic-face-rotation input::-webkit-slider-thumb { appearance: none; width: 11px; height: 11px; border: 2px solid #fff; border-radius: 50%; background: var(--orange); box-shadow: 0 0 0 1px var(--orange); }
 .graphic-face-rotation input::-moz-range-thumb { width: 8px; height: 8px; border: 2px solid #fff; border-radius: 50%; background: var(--orange); box-shadow: 0 0 0 1px var(--orange); }
+.built-in-face-picker { --picker-accent: var(--orange); }
+.built-in-face-grid { max-height: none; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.graphic-library-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 13px 14px 9px; border-top: 1px solid var(--line); }
+.graphic-library-heading b { font-size: 9px; }
+.graphic-library-heading small { color: #777970; font: 400 7px/1.3 "DM Mono", monospace; text-align: right; }
+.graphic-library-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 7px; padding: 10px; background: #f5f2eb; }
+.graphic-library-grid button { min-width: 0; position: relative; padding: 7px 5px 6px; border: 1px solid #ccc8bd; background: #fff; cursor: pointer; }
+.graphic-library-grid button:hover, .graphic-library-grid button:focus-visible { border-color: var(--orange); outline: 1px solid var(--orange); }
+.graphic-library-grid button.selected { border-color: #83a84f; background: #eefbd4; }
+.graphic-library-grid button > span { position: absolute; top: 4px; left: 4px; z-index: 1; padding: 3px; background: #527424; color: #fff; font: 500 6px/1 "DM Mono", monospace; }
+.graphic-library-grid img { width: 100%; height: 42px; display: block; padding: 6px; object-fit: contain; }
+.graphic-library-grid small { display: block; overflow: hidden; color: #565851; font: 400 6px/1.2 "DM Mono", monospace; text-align: center; text-overflow: ellipsis; white-space: nowrap; }
 .preset-label { margin: 20px 0 10px; }
 .preset-row { grid-template-columns: repeat(4, 1fr); margin-bottom: 14px; }
 .preset-row button { text-transform: uppercase; font-size: 8px; }

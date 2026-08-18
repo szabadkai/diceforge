@@ -3,6 +3,38 @@ export function fillFaceSet<T>(items: T[], faceCount: number): T[] {
   return Array.from({ length: faceCount }, (_, index) => items[index % items.length]);
 }
 
+export function fitGraphicSelection<T>(pool: T[], current: T[], faceCount: number): T[] {
+  if (!pool.length || faceCount <= 0) return [];
+  const selected: T[] = [];
+  for (const item of current) {
+    if (pool.includes(item) && !selected.includes(item)) selected.push(item);
+    if (selected.length === faceCount) return selected;
+  }
+  for (const item of pool) {
+    if (!selected.includes(item)) selected.push(item);
+    if (selected.length === faceCount) return selected;
+  }
+  return fillFaceSet(selected, faceCount);
+}
+
+export function assignGraphicToFace<T>(
+  pool: T[],
+  current: T[],
+  faceIndex: number,
+  graphic: T,
+  faceCount: number,
+): T[] {
+  const assignments = fitGraphicSelection(pool, current, faceCount);
+  if (faceIndex < 0 || faceIndex >= assignments.length || !pool.includes(graphic)) return assignments;
+  const existingIndex = assignments.indexOf(graphic);
+  if (existingIndex >= 0 && existingIndex !== faceIndex) {
+    [assignments[faceIndex], assignments[existingIndex]] = [assignments[existingIndex], assignments[faceIndex]];
+  } else {
+    assignments[faceIndex] = graphic;
+  }
+  return assignments;
+}
+
 export function swapFaceAssignments<T>(items: T[], from: number, to: number, faceCount: number): T[] {
   const assignments = fillFaceSet(items, faceCount);
   if (

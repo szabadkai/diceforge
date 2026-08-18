@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">
+  <title>Waving Hungarian tricolor flag</title>
+  <metadata>Red and green are independent paint regions; the white stripe is the untouched dice surface.</metadata>
+  <path id="red-band" data-paint="red" fill="#CE2939" d="M12 55C49 35 88 65 126 54C166 42 202 32 244 48V101C202 85 166 95 126 107C88 118 49 88 12 108Z"/>
+  <path id="green-band" data-paint="green" fill="#477050" d="M12 137C49 117 88 147 126 136C166 124 202 114 244 130V183C202 167 166 177 126 189C88 200 49 170 12 190Z"/>
+</svg>

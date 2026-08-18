@@ -11,7 +11,7 @@ import {
   patternFillScale,
 } from "../src/diceGeometry";
 import { FONT_OPTIONS } from "../src/fontCatalog";
-import { fillFaceSet, removeGraphicAssignments, setFaceRotation, swapFaceAssignments } from "../src/graphicSet";
+import { assignGraphicToFace, fillFaceSet, fitGraphicSelection, removeGraphicAssignments, setFaceRotation, swapFaceAssignments } from "../src/graphicSet";
 import { balancePipValues, dicePipLayouts, facePipLayout, pipLayout } from "../src/markTexture";
 import { printableConfigKey } from "../src/modelConfig";
 import { createSphericalPipCutter, sphericalCapCentroidDepth, sphericalPipDimensions } from "../src/pipGeometry";
@@ -34,6 +34,10 @@ globalThis.requestAnimationFrame = ((callback: FrameRequestCallback) => {
 }) as typeof requestAnimationFrame;
 globalThis.DOMParser = DOMParser as unknown as typeof globalThis.DOMParser;
 
+function svgDataUrl(svg: string) {
+  return `data:image/svg+xml;base64,${Buffer.from(svg, "utf8").toString("base64")}`;
+}
+
 test("custom SVG sets cycle in file order to fill every face", () => {
   assert.deepEqual(fillFaceSet(["leaf", "moon", "duck"], 8), [
     "leaf", "moon", "duck", "leaf", "moon", "duck", "leaf", "moon",
@@ -41,11 +45,33 @@ test("custom SVG sets cycle in file order to fill every face", () => {
   assert.deepEqual(fillFaceSet([], 6), []);
 });
 
-test("every built-in graphic collection maps exactly onto a D6", () => {
+test("larger built-in collections keep chosen faces and fill remaining slots uniquely", () => {
+  const pool = ["parliament", "paprika", "cube", "puli", "whip", "cattle", "tram", "poppy"];
+  assert.deepEqual(fitGraphicSelection(pool, ["whip", "paprika"], 6), [
+    "whip", "paprika", "parliament", "cube", "puli", "cattle",
+  ]);
+  assert.deepEqual(fitGraphicSelection(pool, ["whip", "whip", "unknown"], 3), [
+    "whip", "parliament", "paprika",
+  ]);
+});
+
+test("assigning a selected built-in mark swaps faces and a new mark replaces one face", () => {
+  const pool = ["parliament", "paprika", "cube", "puli", "whip", "cattle", "tram"];
+  const selected = pool.slice(0, 6);
+  assert.deepEqual(assignGraphicToFace(pool, selected, 1, "whip", 6), [
+    "parliament", "whip", "cube", "puli", "paprika", "cattle",
+  ]);
+  assert.deepEqual(assignGraphicToFace(pool, selected, 2, "tram", 6), [
+    "parliament", "paprika", "tram", "puli", "whip", "cattle",
+  ]);
+});
+
+test("built-in graphic collections have the intended die-ready size", () => {
   const root = new URL("../src/assets/dice-themes/", import.meta.url);
   for (const theme of readdirSync(root)) {
     const marks = readdirSync(new URL(`${theme}/`, root)).filter((item) => item.endsWith(".svg"));
-    assert.equal(marks.length, 6, `${theme} must contain exactly six SVG marks`);
+    const expected = theme === "hungary-budapest" ? 20 : 6;
+    assert.equal(marks.length, expected, `${theme} must contain exactly ${expected} SVG marks`);
   }
 });
 
@@ -60,6 +86,22 @@ test("custom SVG rotations support the full degree range and follow face swaps",
   assert.deepEqual(rotated, [0, 90, 273, 90, 0, 90]);
   assert.deepEqual(swapFaceAssignments(rotated, 2, 4, 6), [0, 90, 0, 90, 273, 90]);
   assert.equal(setFaceRotation([], 0, 361, 1)[0], 360);
+});
+
+test("triangular faces put their flat base below labels and graphics", () => {
+  for (const sides of [8, 20] as DieSides[]) {
+    getDieFaceFrames(sides, 24).forEach((frame, faceIndex) => {
+      assert.equal(frame.polygon.length, 3);
+      const [apex, ...base] = [...frame.polygon].sort((a, b) => b.y - a.y);
+      assert.ok(Math.abs(apex.x) < 0.000001, `D${sides} face ${faceIndex} apex must be centered`);
+      assert.ok(apex.y > 0, `D${sides} face ${faceIndex} apex must be above the mark`);
+      assert.ok(base.every((point) => point.y < 0), `D${sides} face ${faceIndex} base must be below the mark`);
+      assert.ok(
+        Math.abs(base[0].y - base[1].y) < 0.000001,
+        `D${sides} face ${faceIndex} base must be horizontal`,
+      );
+    });
+  }
 });
 
 test("removing a custom SVG also removes its aligned name and rotation", () => {
@@ -130,6 +172,7 @@ async function assertWatertight(stl: Blob, label = "STL") {
   assert.ok(audit.signedVolume > 0, `${label} triangle winding must produce a positive enclosed volume`);
   assert.equal(audit.degenerateTriangles, 0, `${label} must not contain zero-area triangles`);
   assert.equal(audit.nonManifoldEdges, 0, `${label} must share every edge between exactly two triangles`);
+  return audit;
 }
 
 async function assertPreviewUsesExactStl(stl: Blob) {
@@ -465,7 +508,7 @@ test("turns uploaded SVG paths into debossed geometry", async () => {
     values: Array.from({ length: 8 }, (_, index) => String(index + 1)),
     color: "#ffffff",
     graphicName: "mark.svg",
-    graphicData: `data:image/svg+xml;base64,${btoa(svg)}`,
+    graphicData: svgDataUrl(svg),
     graphicRotations: [90],
   };
   const stl = await buildDiceStl(config);
@@ -475,7 +518,8 @@ test("turns uploaded SVG paths into debossed geometry", async () => {
 
 test("every built-in SVG mark produces printable D20 geometry", async (context) => {
   const root = new URL("../src/assets/dice-themes/", import.meta.url);
-  for (const theme of readdirSync(root)) {
+  const themes = readdirSync(root).filter((theme) => !process.env.DICE_THEME || theme === process.env.DICE_THEME);
+  for (const theme of themes) {
     const themeUrl = new URL(`${theme}/`, root);
     for (const filename of readdirSync(themeUrl).filter((item) => item.endsWith(".svg"))) {
       await context.test(`${theme}/${filename}`, async () => {
@@ -497,7 +541,7 @@ test("every built-in SVG mark produces printable D20 geometry", async (context) 
           values: Array.from({ length: 20 }, (_, index) => String(index + 1)),
           color: "#ffffff",
           graphicName: filename,
-          graphicData: `data:image/svg+xml;base64,${btoa(svg)}`,
+          graphicData: svgDataUrl(svg),
         };
         await assertWatertight(await buildDiceStl(config), `${theme}/${filename}`);
       });
@@ -507,12 +551,14 @@ test("every built-in SVG mark produces printable D20 geometry", async (context) 
 
 test("every built-in SVG collection produces a printable D20", async (context) => {
   const root = new URL("../src/assets/dice-themes/", import.meta.url);
-  for (const theme of readdirSync(root)) {
+  let blankTriangleCount: number | undefined;
+  const themes = readdirSync(root).filter((theme) => !process.env.DICE_THEME || theme === process.env.DICE_THEME);
+  for (const theme of themes) {
     await context.test(theme, async () => {
       const themeUrl = new URL(`${theme}/`, root);
       const graphicDataSet = readdirSync(themeUrl)
         .filter((item) => item.endsWith(".svg"))
-        .map((filename) => `data:image/svg+xml;base64,${btoa(readFileSync(new URL(filename, themeUrl), "utf8"))}`);
+        .map((filename) => svgDataUrl(readFileSync(new URL(filename, themeUrl), "utf8")));
       const config: DiceConfig = {
         sides: 20,
         size: 24,
@@ -533,7 +579,14 @@ test("every built-in SVG collection produces a printable D20", async (context) =
         graphicData: "",
         graphicDataSet,
       };
-      await assertWatertight(await buildDiceStl(config), theme);
+      if (blankTriangleCount === undefined) {
+        blankTriangleCount = (await auditBinaryStl(await buildDiceStl({
+          ...config,
+          graphicDataSet: [],
+        }))).triangleCount;
+      }
+      const audit = await assertWatertight(await buildDiceStl(config), theme);
+      assert.ok(audit.triangleCount > blankTriangleCount, `${theme} must engrave visible SVG geometry`);
     });
   }
 });

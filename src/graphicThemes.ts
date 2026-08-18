@@ -5,6 +5,7 @@ export interface GraphicTheme {
   accent: string;
   paper: string;
   marks: string[];
+  markNames: string[];
 }
 
 const rawMarks = import.meta.glob<string>("./assets/dice-themes/**/*.svg", {
@@ -16,7 +17,8 @@ const rawMarks = import.meta.glob<string>("./assets/dice-themes/**/*.svg", {
 function mark(path: string) {
   const raw = rawMarks[`./assets/dice-themes/${path}.svg`];
   if (!raw) throw new Error(`Missing built-in dice mark: ${path}`);
-  return `data:image/svg+xml;base64,${btoa(raw)}`;
+  const binary = Array.from(new TextEncoder().encode(raw), (byte) => String.fromCharCode(byte)).join("");
+  return `data:image/svg+xml;base64,${btoa(binary)}`;
 }
 
 function theme(
@@ -27,7 +29,15 @@ function theme(
   paper: string,
   filenames: string[],
 ): GraphicTheme {
-  return { id, name, caption, accent, paper, marks: filenames.map((filename) => mark(`${id}/${filename}`)) };
+  return {
+    id,
+    name,
+    caption,
+    accent,
+    paper,
+    marks: filenames.map((filename) => mark(`${id}/${filename}`)),
+    markNames: filenames,
+  };
 }
 
 export const GRAPHIC_THEMES: GraphicTheme[] = [
@@ -69,6 +79,11 @@ export const GRAPHIC_THEMES: GraphicTheme[] = [
   ]),
   theme("feelings", "Feelings", "Happy · sad · silly · sleepy", "#d96a98", "#fae9f1", [
     "happy", "sad", "wink", "sleepy", "surprised", "silly",
+  ]),
+  theme("hungary-budapest", "Hungary & Budapest", "Parliament · tricolor · Danube charm", "#ce2939", "#eef5e9", [
+    "hungarian-flag", "parliament", "chain-bridge", "fishermans-bastion", "buda-castle",
+    "heroes-square", "thermal-bath", "tram", "holy-crown", "hungary-map", "paprika", "goulash",
+    "puzzle-cube", "langos", "grey-cattle", "balaton", "folk-tulip", "csikos", "kolbasz", "tokaji-grapes",
   ]),
   theme("formlabs", "Formlabs", "Official Form 4 sample-part art", "#ff6a13", "#f4f2ec", [
     "butterfly", "game-controller", "led-light-bar", "robotic-finger", "tower-cap", "connector",
@@ -113,6 +128,26 @@ export const GRAPHIC_THEMES: GraphicTheme[] = [
     "flame", "drop", "mountain", "wind", "snowflake", "earth",
   ]),
 ];
+
+const animalLibraryThemeIds = new Set([
+  "animal-companions",
+  "farmyard-friends",
+  "wild-world",
+  "treetop-friends",
+  "water-world",
+  "ocean-explorers",
+  "tiny-creatures",
+]);
+const animalLibraryThemes = GRAPHIC_THEMES.filter((item) => animalLibraryThemeIds.has(item.id));
+GRAPHIC_THEMES.splice(1, 0, {
+  id: "animal-library",
+  name: "All animal friends",
+  caption: "Choose any animals · make your own set",
+  accent: "#4d9259",
+  paper: "#eaf4e5",
+  marks: animalLibraryThemes.flatMap((item) => item.marks),
+  markNames: animalLibraryThemes.flatMap((item) => item.markNames),
+});
 
 export const DEFAULT_GRAPHIC_THEME = GRAPHIC_THEMES[0];
 

@@ -3,8 +3,8 @@ import { BLADE_SUPPORT_CONTACT_NECK, bladeSupportContactWidth } from "./bladeSup
 import DiceScene from "./DiceScene";
 import { getDieFaceFrames } from "./diceGeometry";
 import { FONT_OPTIONS } from "./fontCatalog";
-import { DEFAULT_GRAPHIC_THEME, GRAPHIC_THEMES } from "./graphicThemes";
-import { fillFaceSet, removeGraphicAssignments, setFaceRotation, swapFaceAssignments } from "./graphicSet";
+import { DEFAULT_GRAPHIC_THEME, getGraphicTheme, GRAPHIC_THEMES } from "./graphicThemes";
+import { assignGraphicToFace, fillFaceSet, fitGraphicSelection, removeGraphicAssignments, setFaceRotation, swapFaceAssignments } from "./graphicSet";
 import { balancePipValues } from "./markTexture";
 import { printableConfigKey } from "./modelConfig";
 import { MAX_PIP_DIAMETER, sphericalCapCentroidDepth, sphericalPipDimensions } from "./pipGeometry";
@@ -63,6 +63,14 @@ function readFileAsDataUrl(file: File) {
   });
 }
 
+function displayGraphicName(name: string) {
+  return name
+    .replace(/\.svg$/i, "")
+    .split("-")
+    .map((word) => word ? word[0].toUpperCase() + word.slice(1) : word)
+    .join(" ");
+}
+
 export default function App() {
   const [config, setConfig] = useState<DiceConfig>({
     sides: 20,
@@ -102,6 +110,7 @@ export default function App() {
   const [graphicUploadState, setGraphicUploadState] = useState<"idle" | "reading" | "error">("idle");
   const [draggedGraphicFace, setDraggedGraphicFace] = useState<number | null>(null);
   const [graphicDropTarget, setGraphicDropTarget] = useState<number | null>(null);
+  const [editingBuiltInFace, setEditingBuiltInFace] = useState(0);
 
   const handleModelBuildStart = useCallback(() => {
     setPreviewState("building");
@@ -139,18 +148,30 @@ export default function App() {
   const bladeContactStyle = config.bladeSupportContactStyle ?? "straight";
 
   const selectSides = (sides: DieSides) => {
-    setConfig((current) => ({
-      ...current,
-      sides,
-      values: current.markStyle === "text"
-        ? textPreset === "custom"
-          ? customText.trim()
-            ? textWordValues(customText, sides)
-            : Array.from({ length: sides }, (_, index) => current.values[index] ?? "")
-          : textPresetValues(textPreset, sides)
-        : standardValues(sides),
-      randomPips: false,
-    }));
+    setConfig((current) => {
+      const graphicTheme = getGraphicTheme(current.graphicSetId);
+      const graphicDataSet = graphicTheme
+        ? fitGraphicSelection(graphicTheme.marks, current.graphicDataSet ?? [], sides)
+        : current.graphicDataSet;
+      return {
+        ...current,
+        sides,
+        values: current.markStyle === "text"
+          ? textPreset === "custom"
+            ? customText.trim()
+              ? textWordValues(customText, sides)
+              : Array.from({ length: sides }, (_, index) => current.values[index] ?? "")
+            : textPresetValues(textPreset, sides)
+          : standardValues(sides),
+        randomPips: false,
+        ...(graphicTheme ? {
+          graphicDataSet,
+          graphicNames: graphicDataSet?.map((graphic) => graphicTheme.markNames[graphicTheme.marks.indexOf(graphic)]),
+          graphicRotations: Array.from({ length: sides }, (_, index) => current.graphicRotations?.[index] ?? 0),
+        } : {}),
+      };
+    });
+    setEditingBuiltInFace((current) => Math.min(current, sides - 1));
     setPreset("standard");
     setExportState("idle");
   };
@@ -371,8 +392,8 @@ export default function App() {
         ...(markStyle === "graphic" && !current.graphicData && !current.graphicDataSet?.length ? {
           graphicName: DEFAULT_GRAPHIC_THEME.name,
           graphicSetId: DEFAULT_GRAPHIC_THEME.id,
-          graphicDataSet: DEFAULT_GRAPHIC_THEME.marks,
-          graphicNames: [],
+          graphicDataSet: fitGraphicSelection(DEFAULT_GRAPHIC_THEME.marks, [], current.sides),
+          graphicNames: fitGraphicSelection(DEFAULT_GRAPHIC_THEME.markNames, [], current.sides),
         } : {}),
       };
     });
@@ -382,20 +403,56 @@ export default function App() {
   };
 
   const applyGraphicTheme = (theme: (typeof GRAPHIC_THEMES)[number]) => {
-    setConfig((current) => ({
-      ...current,
-      markStyle: "graphic",
-      graphicName: theme.name,
-      graphicData: "",
-      graphicSetId: theme.id,
-      graphicDataSet: theme.marks,
-      graphicNames: [],
-      graphicRotations: [],
-      color: theme.paper,
-    }));
+    setConfig((current) => {
+      const graphicDataSet = fitGraphicSelection(theme.marks, [], current.sides);
+      return {
+        ...current,
+        markStyle: "graphic",
+        graphicName: theme.name,
+        graphicData: "",
+        graphicSetId: theme.id,
+        graphicDataSet,
+        graphicNames: graphicDataSet.map((graphic) => theme.markNames[theme.marks.indexOf(graphic)]),
+        graphicRotations: Array.from({ length: current.sides }, () => 0),
+        color: theme.paper,
+      };
+    });
+    setEditingBuiltInFace(0);
     setPreset("custom");
     setExportState("idle");
   };
+
+  const assignBuiltInGraphic = (graphic: string) => {
+    setConfig((current) => {
+      const theme = getGraphicTheme(current.graphicSetId);
+      if (!theme) return current;
+      const faceIndex = Math.min(editingBuiltInFace, current.sides - 1);
+      const graphicDataSet = assignGraphicToFace(
+        theme.marks,
+        current.graphicDataSet ?? [],
+        faceIndex,
+        graphic,
+        current.sides,
+      );
+      return {
+        ...current,
+        graphicDataSet,
+        graphicNames: graphicDataSet.map((item) => theme.markNames[theme.marks.indexOf(item)]),
+      };
+    });
+    setExportState("idle");
+  };
+
+  const activeGraphicTheme = getGraphicTheme(config.graphicSetId);
+  const builtInGraphics = activeGraphicTheme
+    ? fitGraphicSelection(activeGraphicTheme.marks, config.graphicDataSet ?? [], config.sides)
+    : [];
+  const builtInGraphicNames = activeGraphicTheme
+    ? builtInGraphics.map((graphic) => activeGraphicTheme.markNames[activeGraphicTheme.marks.indexOf(graphic)])
+    : [];
+  const builtInGraphicRotations = activeGraphicTheme
+    ? Array.from({ length: config.sides }, (_, index) => config.graphicRotations?.[index] ?? 0)
+    : [];
 
   const customGraphics = config.graphicSetId === "custom"
     ? fillFaceSet(config.graphicDataSet?.length ? config.graphicDataSet : config.graphicData ? [config.graphicData] : [], config.sides)
@@ -562,7 +619,7 @@ export default function App() {
             {config.markStyle === "graphic" && (
               <div className="graphic-picker">
                 <div className="graphic-picker-heading">
-                  <span><b>Built-in collections</b><small>Marks cycle across every die size</small></span>
+                  <span><b>Built-in collections</b><small>Pick the exact marks you want from larger collections</small></span>
                   <span>{GRAPHIC_THEMES.length} SETS</span>
                 </div>
                 <div className="theme-grid" role="group" aria-label="Built-in graphic sets">
@@ -597,6 +654,105 @@ export default function App() {
                   <em>{config.graphicSetId === "custom" && (config.graphicData || config.graphicDataSet?.length) ? "REPLACE SET" : "CHOOSE FILES"}</em>
                 </label>
                 {graphicUploadState === "error" && <p className="graphic-upload-error" role="alert">Choose one or more valid SVG files.</p>}
+                {activeGraphicTheme && activeGraphicTheme.marks.length > config.sides && (
+                  <section className="graphic-set-editor built-in-face-picker" aria-labelledby="built-in-face-picker-title">
+                    <div className="graphic-set-editor-heading">
+                      <span>
+                        <b id="built-in-face-picker-title">Pick your D{config.sides} faces</b>
+                        <small>Select a face slot, then choose its mark from all {activeGraphicTheme.marks.length}</small>
+                      </span>
+                      <div className="graphic-set-editor-actions">
+                        <span>{config.sides} OF {activeGraphicTheme.marks.length} SELECTED</span>
+                      </div>
+                    </div>
+                    <div className="graphic-face-grid built-in-face-grid" role="list" aria-label={`Selected marks for ${config.sides} faces`}>
+                      {builtInGraphics.map((graphic, index) => (
+                        <div
+                          className={`graphic-face-card selectable ${editingBuiltInFace === index ? "active" : ""} ${draggedGraphicFace === index ? "dragging" : ""} ${graphicDropTarget === index ? "drop-target" : ""}`}
+                          key={index}
+                          role="listitem"
+                          tabIndex={0}
+                          aria-label={`Face ${index + 1}: ${displayGraphicName(builtInGraphicNames[index])}. Select to change this face.`}
+                          onClick={() => setEditingBuiltInFace(index)}
+                          onKeyDown={(event) => {
+                            if (event.key === "Enter" || event.key === " ") {
+                              event.preventDefault();
+                              setEditingBuiltInFace(index);
+                            } else {
+                              handleGraphicKey(event, index);
+                            }
+                          }}
+                          onDragOver={(event) => {
+                            event.preventDefault();
+                            event.dataTransfer.dropEffect = "move";
+                            setGraphicDropTarget(index);
+                          }}
+                          onDragLeave={() => setGraphicDropTarget((current) => current === index ? null : current)}
+                          onDrop={(event) => handleGraphicDrop(event, index)}
+                        >
+                          <div className="graphic-face-card-top">
+                            <span>F{String(index + 1).padStart(2, "0")}</span>
+                            <span className="graphic-face-card-actions">
+                              {editingBuiltInFace === index && <b>CHOOSING</b>}
+                              <i
+                                draggable
+                                aria-label={`Drag face ${index + 1} to reorder`}
+                                onDragStart={(event) => {
+                                  event.dataTransfer.effectAllowed = "move";
+                                  event.dataTransfer.setData("text/plain", String(index));
+                                  setDraggedGraphicFace(index);
+                                }}
+                                onDragEnd={() => {
+                                  setDraggedGraphicFace(null);
+                                  setGraphicDropTarget(null);
+                                }}
+                              >⠿</i>
+                            </span>
+                          </div>
+                          <img src={graphic} alt="" draggable={false} style={{ transform: `rotate(${builtInGraphicRotations[index]}deg)` }} />
+                          <small title={displayGraphicName(builtInGraphicNames[index])}>{displayGraphicName(builtInGraphicNames[index])}</small>
+                          <label className="graphic-face-rotation" onClick={(event) => event.stopPropagation()}>
+                            <span>ANGLE</span>
+                            <input
+                              type="range"
+                              min="0"
+                              max="360"
+                              step="1"
+                              value={builtInGraphicRotations[index]}
+                              aria-label={`Rotate face ${index + 1}`}
+                              onInput={(event) => rotateGraphicFace(index, Number(event.currentTarget.value))}
+                            />
+                            <output>{builtInGraphicRotations[index]}°</output>
+                          </label>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="graphic-library-heading">
+                      <b>Choose mark for F{String(editingBuiltInFace + 1).padStart(2, "0")}</b>
+                      <small>Choosing an already-used mark swaps its face</small>
+                    </div>
+                    <div className="graphic-library-grid" role="group" aria-label={`${activeGraphicTheme.name} mark library`}>
+                      {activeGraphicTheme.marks.map((graphic, index) => {
+                        const selectedIndex = builtInGraphics.indexOf(graphic);
+                        const name = displayGraphicName(activeGraphicTheme.markNames[index]);
+                        return (
+                          <button
+                            type="button"
+                            key={activeGraphicTheme.markNames[index]}
+                            className={selectedIndex >= 0 ? "selected" : ""}
+                            aria-pressed={selectedIndex >= 0}
+                            aria-label={`Use ${name} on face ${editingBuiltInFace + 1}${selectedIndex >= 0 ? `; currently on face ${selectedIndex + 1}` : ""}`}
+                            onClick={() => assignBuiltInGraphic(graphic)}
+                          >
+                            {selectedIndex >= 0 && <span>F{String(selectedIndex + 1).padStart(2, "0")}</span>}
+                            <img src={graphic} alt="" />
+                            <small title={name}>{name}</small>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </section>
+                )}
                 {customGraphics.length > 0 && (
                   <section className="graphic-set-editor" aria-labelledby="graphic-set-title">
                     <div className="graphic-set-editor-heading">

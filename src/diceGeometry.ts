@@ -261,14 +261,30 @@ export function getFaceFrames(geometry: THREE.BufferGeometry): FaceFrame[] {
     const guide = Math.abs(normal.y) < 0.86
       ? new THREE.Vector3(0, 1, 0)
       : new THREE.Vector3(1, 0, 0);
-    const tangent = new THREE.Vector3().crossVectors(guide, normal).normalize();
-    const bitangent = new THREE.Vector3().crossVectors(normal, tangent).normalize();
+    let tangent = new THREE.Vector3().crossVectors(guide, normal).normalize();
+    let bitangent = new THREE.Vector3().crossVectors(normal, tangent).normalize();
     const uniqueVertices = group.vertices.filter((vertex, index, all) =>
       all.findIndex((other) => other.distanceToSquared(vertex) < 0.0001) === index,
     );
     const center = uniqueVertices
       .reduce((sum, point) => sum.add(point), new THREE.Vector3())
       .multiplyScalar(1 / uniqueVertices.length);
+
+    // A projected world-up vector does not give every triangular face the
+    // same visual orientation: some faces end up inverted or sideways. Point
+    // local +Y at one corner so the opposite edge is always the lower, flat
+    // base beneath text and graphics. Prefer the corner already nearest +Y to
+    // avoid unnecessary rotation around the face normal.
+    if (uniqueVertices.length === 3) {
+      const apex = uniqueVertices.reduce((best, vertex) => {
+        const height = vertex.clone().sub(center).dot(bitangent);
+        const bestHeight = best.clone().sub(center).dot(bitangent);
+        return height > bestHeight ? vertex : best;
+      });
+      bitangent = apex.clone().sub(center).normalize();
+      tangent = new THREE.Vector3().crossVectors(bitangent, normal).normalize();
+    }
+
     const polygon = uniqueVertices
       .map((vertex) => {
         const relative = vertex.clone().sub(center);
