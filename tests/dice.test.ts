@@ -10,6 +10,7 @@ import {
   getDieFaceFrames,
   patternFillScale,
 } from "../src/diceGeometry";
+import { standardDieValues } from "../src/diceValues";
 import { FONT_OPTIONS } from "../src/fontCatalog";
 import { assignGraphicToFace, fillFaceSet, fitGraphicSelection, removeGraphicAssignments, setFaceRotation, swapFaceAssignments } from "../src/graphicSet";
 import { balancePipValues, dicePipLayouts, facePipLayout, pipLayout } from "../src/markTexture";
@@ -33,6 +34,71 @@ globalThis.requestAnimationFrame = ((callback: FrameRequestCallback) => {
   return 0;
 }) as typeof requestAnimationFrame;
 globalThis.DOMParser = DOMParser as unknown as typeof globalThis.DOMParser;
+
+test("standard dice use conventional complementary opposite faces", () => {
+  for (const sides of [6, 8, 10, 12, 20] as DieSides[]) {
+    const frames = getDieFaceFrames(sides, 24);
+    const values = standardDieValues(sides);
+    const expected = sides === 10
+      ? Array.from({ length: 10 }, (_, index) => String(index))
+      : Array.from({ length: sides }, (_, index) => String(index + 1));
+    assert.deepEqual([...values].sort((a, b) => Number(a) - Number(b)), expected);
+    frames.forEach((frame, index) => {
+      const opposite = frames
+        .map((candidate, candidateIndex) => ({
+          candidateIndex,
+          dot: frame.normal.dot(candidate.normal),
+        }))
+        .filter(({ candidateIndex }) => candidateIndex !== index)
+        .sort((a, b) => a.dot - b.dot)[0].candidateIndex;
+      assert.equal(
+        Number(values[index]) + Number(values[opposite]),
+        sides === 10 ? 9 : sides + 1,
+        `D${sides} face ${index + 1} and its opposite must have a constant sum`,
+      );
+    });
+  }
+});
+
+test("standard D6 uses the familiar right-handed face order", () => {
+  const frames = getDieFaceFrames(6, 24);
+  const values = standardDieValues(6);
+  const valueNearest = (direction: Vector3) => values[frames
+    .map((frame, index) => ({ index, dot: frame.normal.dot(direction) }))
+    .sort((a, b) => b.dot - a.dot)[0].index];
+  assert.equal(valueNearest(new Vector3(0, 1, 0)), "6");
+  assert.equal(valueNearest(new Vector3(1, 0, 0)), "5");
+  assert.equal(valueNearest(new Vector3(0, 0, -1)), "4");
+});
+
+test("standard D10 separates odd and even values around its poles", () => {
+  const frames = getDieFaceFrames(10, 24);
+  const values = standardDieValues(10);
+  const upper = frames
+    .map((frame, index) => ({ frame, index }))
+    .filter(({ frame }) => frame.normal.y > 0)
+    .map(({ index }) => Number(values[index]));
+  assert.ok(upper.every((value) => value % 2 === 1));
+  assert.ok(frames
+    .map((frame, index) => ({ frame, index }))
+    .filter(({ frame }) => frame.normal.y < 0)
+    .map(({ index }) => Number(values[index]))
+    .every((value) => value % 2 === 0));
+});
+
+test("standard D20 places 2, 8, and 14 around the 20 face", () => {
+  const frames = getDieFaceFrames(20, 24);
+  const values = standardDieValues(20);
+  const twenty = values.indexOf("20");
+  const neighbors = frames
+    .map((frame, index) => ({ index, dot: frames[twenty].normal.dot(frame.normal) }))
+    .filter(({ index }) => index !== twenty)
+    .sort((a, b) => b.dot - a.dot)
+    .slice(0, 3)
+    .map(({ index }) => values[index])
+    .sort((a, b) => Number(a) - Number(b));
+  assert.deepEqual(neighbors, ["2", "8", "14"]);
+});
 
 function svgDataUrl(svg: string) {
   return `data:image/svg+xml;base64,${Buffer.from(svg, "utf8").toString("base64")}`;

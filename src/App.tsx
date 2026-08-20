@@ -2,6 +2,7 @@ import { ChangeEvent, DragEvent, KeyboardEvent, useCallback, useMemo, useState }
 import { BLADE_SUPPORT_CONTACT_NECK, bladeSupportContactWidth } from "./bladeSupports";
 import DiceScene from "./DiceScene";
 import { getDieFaceFrames } from "./diceGeometry";
+import { standardDieValues } from "./diceValues";
 import { FONT_OPTIONS } from "./fontCatalog";
 import { DEFAULT_GRAPHIC_THEME, getGraphicTheme, GRAPHIC_THEMES } from "./graphicThemes";
 import { assignGraphicToFace, fillFaceSet, fitGraphicSelection, removeGraphicAssignments, setFaceRotation, swapFaceAssignments } from "./graphicSet";
@@ -17,36 +18,8 @@ const DIE_OPTIONS: DieSides[] = [6, 8, 10, 12, 20];
 const COLORS = ["#f2eee4", "#ff6433", "#b8f247", "#7ba9ff", "#272a25"];
 const FORM_NOW_URL = "https://now.formlabs.com/";
 
-function standardValues(sides: DieSides) {
-  if (sides === 10) return Array.from({ length: 10 }, (_, index) => String(index));
-  return Array.from({ length: sides }, (_, index) => String(index + 1));
-}
-
-function oppositeValues(sides: DieSides) {
-  const frames = getDieFaceFrames(sides, 24);
-  const result = Array.from({ length: sides }, () => "");
-  const available = new Set(frames.map((_, index) => index));
-  let low = sides === 10 ? 0 : 1;
-  let high = sides === 10 ? 9 : sides;
-  while (available.size) {
-    const first = available.values().next().value as number;
-    available.delete(first);
-    const opposite = [...available].sort(
-      (a, b) => frames[first].normal.dot(frames[a].normal) - frames[first].normal.dot(frames[b].normal),
-    )[0];
-    result[first] = String(low);
-    if (opposite !== undefined) {
-      result[opposite] = String(high);
-      available.delete(opposite);
-    }
-    low += 1;
-    high -= 1;
-  }
-  return result;
-}
-
 function shuffleValues(sides: DieSides) {
-  const result = standardValues(sides);
+  const result = standardDieValues(sides);
   for (let index = result.length - 1; index > 0; index -= 1) {
     const swap = Math.floor(Math.random() * (index + 1));
     [result[index], result[swap]] = [result[swap], result[index]];
@@ -86,7 +59,7 @@ export default function App() {
     faceText: "LUCKY",
     randomPips: false,
     pipSeed: 2026,
-    values: standardValues(20),
+    values: standardDieValues(20),
     color: COLORS[0],
     graphicName: "",
     graphicData: "",
@@ -162,7 +135,7 @@ export default function App() {
               ? textWordValues(customText, sides)
               : Array.from({ length: sides }, (_, index) => current.values[index] ?? "")
             : textPresetValues(textPreset, sides)
-          : standardValues(sides),
+          : standardDieValues(sides),
         randomPips: false,
         ...(graphicTheme ? {
           graphicDataSet,
@@ -180,9 +153,7 @@ export default function App() {
     const randomPipLayout = nextPreset === "random" && config.markStyle === "pips";
     const pipSeed = randomPipLayout ? Math.floor(Math.random() * 2_000_000_000) : config.pipSeed;
     const values = nextPreset === "standard"
-      ? standardValues(config.sides)
-      : nextPreset === "opposites"
-        ? oppositeValues(config.sides)
+      ? standardDieValues(config.sides)
         : nextPreset === "random"
           ? randomPipLayout
             ? (() => {
@@ -380,7 +351,7 @@ export default function App() {
       const values = markStyle === "text"
         ? textWordValues(customText || faceText, current.sides)
         : markStyle === "numbers" || markStyle === "pips"
-          ? standardValues(current.sides)
+          ? standardDieValues(current.sides)
           : current.values;
       return {
         ...current,
@@ -838,7 +809,7 @@ export default function App() {
               <>
                 <div className="preset-label"><b>Distribution</b><small>Quick layouts or edit each face</small></div>
                 <div className="preset-row">
-                  {(["standard", "opposites", "random", "blank"] as DistributionPreset[]).map((option) => (
+                  {(["standard", "random", "blank"] as DistributionPreset[]).map((option) => (
                     <button key={option} type="button" className={preset === option ? "selected" : ""} onClick={() => applyPreset(option)}>
                       {option === "random" ? config.markStyle === "pips" ? "balanced random" : "shuffle" : option}
                     </button>

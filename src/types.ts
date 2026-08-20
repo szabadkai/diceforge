@@ -1,6 +1,6 @@
 export type DieSides = 6 | 8 | 10 | 12 | 20;
 export type MarkStyle = "numbers" | "pips" | "text" | "graphic";
-export type DistributionPreset = "standard" | "opposites" | "random" | "blank";
+export type DistributionPreset = "standard" | "random" | "blank";
 export type BladeSupportContactStyle = "straight" | "staggered" | "dotted";
 export type FontId =
   | "helvetiker-bold"
